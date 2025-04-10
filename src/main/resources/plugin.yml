@@ -1,0 +1,7 @@
+name: DiscordConnectorPlugin
+version: 1.0.0
+main: io.github.ariuan.connectorPlugin.ConnectorPlugin
+description: An connection plugin
+author: Ariuan
+website: https://github.com/irisariuan
+api-version: '1.21.4'
