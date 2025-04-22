@@ -6,9 +6,11 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import fi.iki.elonen.NanoHTTPD;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -110,6 +112,15 @@ public class HttpServer extends NanoHTTPD {
                     }
                     case "/ping": {
                         return newFixedLengthResponse(Response.Status.OK, MIME_PLAINTEXT, "Pong!");
+                    }
+                    case "/plugins": {
+                        var nameList = new JsonArray();
+                        for (Plugin plugin: Bukkit.getPluginManager().getPlugins()) {
+                            nameList.add(plugin.getName());
+                        }
+                        JsonObject response = new JsonObject();
+                        response.add("plugins", nameList);
+                        return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());
                     }
                 }
                 return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not found");
