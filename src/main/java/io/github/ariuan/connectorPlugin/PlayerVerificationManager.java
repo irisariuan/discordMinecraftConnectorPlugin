@@ -76,6 +76,7 @@ public class PlayerVerificationManager {
 
             JsonObject json = new JsonObject();
             json.addProperty("uuid", uuid.toString());
+            json.addProperty("serverPort", Bukkit.getServer().getPort());
 
             try (OutputStream os = conn.getOutputStream()) {
                 byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);
@@ -143,6 +144,7 @@ public class PlayerVerificationManager {
             JsonObject json = new JsonObject();
             json.addProperty("uuid", uuid.toString());
             json.addProperty("onlineTime", onlineTime);
+            json.addProperty("serverPort", Bukkit.getServer().getPort());
 
             try (OutputStream os = conn.getOutputStream()) {
                 byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);

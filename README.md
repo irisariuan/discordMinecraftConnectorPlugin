@@ -49,7 +49,8 @@ api-url: "http://localhost:8080"
 **Request:**
 ```json
 {
-  "uuid": "player-uuid-here"
+  "uuid": "player-uuid-here",
+  "serverPort": 25565
 }
 ```
 
@@ -66,7 +67,8 @@ api-url: "http://localhost:8080"
 ```json
 {
   "uuid": "player-uuid-here",
-  "onlineTime": 1234
+  "onlineTime": 1234,
+  "serverPort": 25565
 }
 ```
 
