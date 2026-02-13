@@ -14,13 +14,15 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Handler;
 import java.util.logging.SimpleFormatter;
 
 public class ConnectorPlugin extends JavaPlugin implements Listener {
-    private HttpServer httpServer;
+    private IPCServer ipcServer;
     private static ConnectorPlugin instance;
     private LogCaptureHandler logCaptureHandler;
     private final List<BukkitTask> shutdownTask = new ArrayList<>();
@@ -60,8 +62,10 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
         getLogger().addHandler(logCaptureHandler);
 
         try {
-            httpServer = new HttpServer(6001, logCaptureHandler);
-            getLogger().info("HTTP server started on port: " + 6001);
+            // Use Unix Domain Socket in the plugin's data folder
+            Path socketPath = Paths.get(getDataFolder().getAbsolutePath(), "minecraft-ipc.sock");
+            ipcServer = new IPCServer(socketPath, logCaptureHandler);
+            getLogger().info("IPC server started on socket: " + socketPath);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -154,8 +158,8 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
         if (verificationManager != null) {
             verificationManager.cleanup();
         }
-        if (httpServer != null){
-            httpServer.stop();
+        if (ipcServer != null){
+            ipcServer.stop();
         }
         if (logCaptureHandler != null) {
             getLogger().removeHandler(logCaptureHandler);
