@@ -192,7 +192,7 @@ This plugin uses IPC (Unix Domain Sockets) instead of HTTP for local communicati
 
 - PaperMC API 1.21.4
 - GSON 2.12.1 (for JSON serialization)
-- Java 21+ (for Unix Domain Socket support)
+- Java 21+ (LTS version with Unix Domain Socket support introduced in Java 16)
 
 ## Building
 
@@ -202,4 +202,4 @@ This plugin uses IPC (Unix Domain Sockets) instead of HTTP for local communicati
 
 The compiled JAR will be in `build/libs/`.
 
-**Note**: Requires Java 21 or higher to build and run due to Unix Domain Socket support. The code is compatible with Java 23 and higher.
+**Note**: While Unix Domain Sockets were introduced in Java 16, we use Java 21 as it's a Long Term Support (LTS) version with better stability and maintenance. The code is compatible with Java 23 and higher.

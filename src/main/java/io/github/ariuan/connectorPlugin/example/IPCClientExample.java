@@ -20,7 +20,8 @@ public class IPCClientExample {
 
     public static void main(String[] args) {
         // Example: Connect to the IPC server and send a ping request
-        Path socketPath = Paths.get("/path/to/plugins/DiscordConnectorPlugin/minecraft-ipc.sock");
+        // Note: Replace this path with your actual plugin directory path
+        Path socketPath = Paths.get("plugins/DiscordConnectorPlugin/minecraft-ipc.sock");
         
         try {
             // Example 1: Ping the server

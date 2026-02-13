@@ -127,11 +127,11 @@ public class IPCServer {
                 JsonObject json = body.isEmpty() ? new JsonObject() : JsonParser.parseString(body).getAsJsonObject();
                 switch (path) {
                     case "/runCommand": {
-                        String command = json.get("command").getAsString();
-                        Bukkit.getLogger().info("Called command: " + command);
-                        if (command == null) {
+                        if (!json.has("command")) {
                             return "{\"error\": \"Missing command\"}";
                         }
+                        String command = json.get("command").getAsString();
+                        Bukkit.getLogger().info("Called command: " + command);
                         CompletableFuture<String> future = new CompletableFuture<>();
 
                         Bukkit.getScheduler().runTask(ConnectorPlugin.getInstance(), () -> {
@@ -162,6 +162,9 @@ public class IPCServer {
                         }
                     }
                     case "/shutdown": {
+                        if (!json.has("tick")) {
+                            return "{\"error\": \"Missing tick parameter\"}";
+                        }
                         long tickDelay = json.get("tick").getAsLong();
                         boolean successful = ConnectorPlugin.getInstance().shutdown(tickDelay);
                         JsonObject response = new JsonObject();
