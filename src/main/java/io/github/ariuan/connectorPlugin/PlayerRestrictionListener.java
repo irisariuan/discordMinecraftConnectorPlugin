@@ -79,14 +79,6 @@ public class PlayerRestrictionListener implements Listener {
                 player.sendMessage("§cYou must be verified before dealing damage.");
             }
         }
-
-        // Also check if the victim is a player (prevent them from being damaged)
-        Entity entity = event.getEntity();
-        if (entity instanceof Player) {
-            Player player = (Player) entity;
-            if (!verificationManager.isVerified(player.getUniqueId())) {
-                event.setCancelled(true);
-            }
-        }
+        // Note: Victim protection is handled by onEntityDamage() event handler
     }
 }

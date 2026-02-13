@@ -187,7 +187,7 @@ public class PlayerVerificationManager {
 
     private static class PlayerSession {
         private final long joinTime;
-        private boolean verified;
+        private volatile boolean verified;
 
         public PlayerSession() {
             this.joinTime = System.currentTimeMillis();
