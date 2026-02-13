@@ -18,12 +18,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PlayerVerificationManager {
     private final ConnectorPlugin plugin;
     private final String apiUrl;
+    private final int serverPort;
     private final Map<UUID, PlayerSession> playerSessions = new ConcurrentHashMap<>();
     private final Map<UUID, BukkitTask> monitoringTasks = new ConcurrentHashMap<>();
 
     public PlayerVerificationManager(ConnectorPlugin plugin, String apiUrl) {
         this.plugin = plugin;
         this.apiUrl = apiUrl;
+        this.serverPort = Bukkit.getServer().getPort();
     }
 
     public void verifyPlayer(Player player) {
@@ -76,7 +78,7 @@ public class PlayerVerificationManager {
 
             JsonObject json = new JsonObject();
             json.addProperty("uuid", uuid.toString());
-            json.addProperty("serverPort", Bukkit.getServer().getPort());
+            json.addProperty("serverPort", serverPort);
 
             try (OutputStream os = conn.getOutputStream()) {
                 byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);
@@ -144,7 +146,7 @@ public class PlayerVerificationManager {
             JsonObject json = new JsonObject();
             json.addProperty("uuid", uuid.toString());
             json.addProperty("onlineTime", onlineTime);
-            json.addProperty("serverPort", Bukkit.getServer().getPort());
+            json.addProperty("serverPort", serverPort);
 
             try (OutputStream os = conn.getOutputStream()) {
                 byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);
