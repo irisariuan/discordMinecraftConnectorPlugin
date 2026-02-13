@@ -7,10 +7,10 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerPickupItemEvent;
 
 public class PlayerRestrictionListener implements Listener {
     private final PlayerVerificationManager verificationManager;
@@ -20,11 +20,13 @@ public class PlayerRestrictionListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void onPlayerPickupItem(PlayerPickupItemEvent event) {
-        Player player = event.getPlayer();
-        if (!verificationManager.isVerified(player.getUniqueId())) {
-            event.setCancelled(true);
-            player.sendMessage("§cYou must be verified before picking up items.");
+    public void onEntityPickupItem(EntityPickupItemEvent event) {
+        if (event.getEntity() instanceof Player) {
+            Player player = (Player) event.getEntity();
+            if (!verificationManager.isVerified(player.getUniqueId())) {
+                event.setCancelled(true);
+                player.sendMessage("§cYou must be verified before picking up items.");
+            }
         }
     }
 
