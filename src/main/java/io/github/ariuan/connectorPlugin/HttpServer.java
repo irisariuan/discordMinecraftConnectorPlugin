@@ -5,23 +5,26 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import fi.iki.elonen.NanoHTTPD;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
 public class HttpServer extends NanoHTTPD {
-    private LogCaptureHandler logCaptureHandler;
+    private final LogCaptureHandler logCaptureHandler;
+    private final Logger logger;
 
     public HttpServer(int port, LogCaptureHandler logCaptureHandler) throws IOException {
         super(port);
         this.logCaptureHandler = logCaptureHandler;
+        this.logger = ConnectorPlugin.getInstance().getLogger();
         start(SOCKET_READ_TIMEOUT, false);
         System.out.println("HTTP Server started on port " + port);
     }
@@ -38,7 +41,6 @@ public class HttpServer extends NanoHTTPD {
                 switch (uri) {
                     case "/runCommand": {
                         String command = json.get("command").getAsString();
-                        Bukkit.getLogger().info("Called command: " + command);
                         if (command == null) {
                             return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Bad Request, Missing command");
                         }
@@ -47,7 +49,6 @@ public class HttpServer extends NanoHTTPD {
                         Bukkit.getScheduler().runTask(ConnectorPlugin.getInstance(), () -> {
                             CapturingConsoleSender sender = new CapturingConsoleSender();
                             LogCapture logCapture = new LogCapture();
-                            Logger logger = Bukkit.getLogger();
                             logger.addHandler(logCapture);
                             boolean success = Bukkit.dispatchCommand(sender, command);
 
@@ -73,13 +74,35 @@ public class HttpServer extends NanoHTTPD {
                         response.addProperty("success", successful);
                         return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());
                     }
+                    case "/register": {
+                        String playerName = json.get("playerName").getAsString();
+                        String otp = json.get("otp").getAsString();
+                        var player = ConnectorPlugin.getInstance().getServer().getPlayerExact(playerName);
+                        if (player == null) {
+                            return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Player not found");
+                        }
+                        player.sendMessage(Component.text("Here's your OTP: " + otp));
+                        JsonObject response = new JsonObject();
+                        response.addProperty("success", true);
+                        response.addProperty("uuid", player.getUniqueId().toString());
+                        return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());
+                    }
+                    case "/registered": {
+                        String uuid  = json.get("uuid").getAsString();
+                        var player = ConnectorPlugin.getInstance().getServer().getPlayer(UUID.fromString(uuid));
+                        if (player == null) {
+                            return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Player not found");
+                        }
+                        ConnectorPlugin.getInstance().verifyPlayer(player);
+                        return newFixedLengthResponse(Response.Status.OK, MIME_PLAINTEXT, "Ok");
+                    }
                 }
             } else if (Method.GET.equals(session.getMethod())) {
                 String uri = session.getUri();
                 switch (uri) {
                     case "/logs": {
                         JsonArray arr = getJsonArray();
-                        Bukkit.getLogger().info("Called logs");
+                        logger.info("Called logs");
                         return newFixedLengthResponse(Response.Status.OK, "application/json", arr.toString());
                     }
                     case "/players": {
@@ -115,7 +138,7 @@ public class HttpServer extends NanoHTTPD {
                     }
                     case "/plugins": {
                         var nameList = new JsonArray();
-                        for (Plugin plugin: Bukkit.getPluginManager().getPlugins()) {
+                        for (Plugin plugin : Bukkit.getPluginManager().getPlugins()) {
                             nameList.add(plugin.getName());
                         }
                         JsonObject response = new JsonObject();
@@ -126,7 +149,7 @@ public class HttpServer extends NanoHTTPD {
                 return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not found");
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            ConnectorPlugin.getInstance().getLogger().warning("Error writing log: " + e.getMessage());
             return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "Internal error");
         }
         return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not Found");

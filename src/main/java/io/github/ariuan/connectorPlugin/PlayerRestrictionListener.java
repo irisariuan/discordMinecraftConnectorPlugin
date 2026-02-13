@@ -1,16 +1,15 @@
 package io.github.ariuan.connectorPlugin;
 
+import io.papermc.paper.event.player.AsyncChatEvent;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.entity.EntityPickupItemEvent;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.entity.*;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 
 public class PlayerRestrictionListener implements Listener {
     private final PlayerVerificationManager verificationManager;
@@ -21,12 +20,8 @@ public class PlayerRestrictionListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onEntityPickupItem(EntityPickupItemEvent event) {
-        if (event.getEntity() instanceof Player) {
-            Player player = (Player) event.getEntity();
-            if (!verificationManager.isVerified(player.getUniqueId())) {
-                event.setCancelled(true);
-                player.sendMessage("§cYou must be verified before picking up items.");
-            }
+        if (event.getEntity() instanceof Player player && !verificationManager.isVerified(player.getUniqueId())) {
+            event.setCancelled(true);
         }
     }
 
@@ -35,7 +30,6 @@ public class PlayerRestrictionListener implements Listener {
         Player player = event.getPlayer();
         if (!verificationManager.isVerified(player.getUniqueId())) {
             event.setCancelled(true);
-            player.sendMessage("§cYou must be verified before dropping items.");
         }
     }
 
@@ -44,27 +38,22 @@ public class PlayerRestrictionListener implements Listener {
         Player player = event.getPlayer();
         if (!verificationManager.isVerified(player.getUniqueId())) {
             event.setCancelled(true);
-            player.sendMessage("§cYou must be verified before interacting with blocks.");
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void onPlayerChat(AsyncPlayerChatEvent event) {
+    public void onPlayerChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
         if (!verificationManager.isVerified(player.getUniqueId())) {
             event.setCancelled(true);
-            player.sendMessage("§cYou must be verified before sending chat messages.");
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onEntityDamage(EntityDamageEvent event) {
         Entity entity = event.getEntity();
-        if (entity instanceof Player) {
-            Player player = (Player) entity;
-            if (!verificationManager.isVerified(player.getUniqueId())) {
-                event.setCancelled(true);
-            }
+        if (entity instanceof Player player && !verificationManager.isVerified(player.getUniqueId())) {
+            event.setCancelled(true);
         }
     }
 
@@ -72,13 +61,33 @@ public class PlayerRestrictionListener implements Listener {
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         // Check if the damager is a player
         Entity damager = event.getDamager();
-        if (damager instanceof Player) {
-            Player player = (Player) damager;
-            if (!verificationManager.isVerified(player.getUniqueId())) {
-                event.setCancelled(true);
-                player.sendMessage("§cYou must be verified before dealing damage.");
-            }
+        if (damager instanceof Player player && !verificationManager.isVerified(player.getUniqueId())) {
+            event.setCancelled(true);
         }
         // Note: Victim protection is handled by onEntityDamage() event handler
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onEntityTargetLiving(EntityTargetLivingEntityEvent event) {
+        Entity entity = event.getEntity();
+        if (entity instanceof Player player && !verificationManager.isVerified(player.getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onEntityTarget(EntityTargetEvent event) {
+        Entity entity = event.getEntity();
+        if (entity instanceof Player player && !verificationManager.isVerified(player.getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        if (!verificationManager.isVerified(player.getUniqueId())) {
+            event.setCancelled(true);
+        }
     }
 }

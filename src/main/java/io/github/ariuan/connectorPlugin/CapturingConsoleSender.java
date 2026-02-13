@@ -24,7 +24,7 @@ public class CapturingConsoleSender implements ConsoleCommandSender {
     }
 
     @Override
-    public void sendMessage(String message) {
+    public void sendMessage(@NotNull String message) {
         output.append(message).append("\n");
         console.sendMessage(message);
     }
@@ -37,7 +37,7 @@ public class CapturingConsoleSender implements ConsoleCommandSender {
     }
 
     @Override
-    public void sendMessage(UUID sender, String message) {
+    public void sendMessage(UUID sender, @NotNull String message) {
         sendMessage(message);
     }
 
@@ -68,32 +68,32 @@ public class CapturingConsoleSender implements ConsoleCommandSender {
     }
 
     @Override
-    public boolean isPermissionSet(String name) {
+    public boolean isPermissionSet(@NotNull String name) {
         return true;
     }
 
     @Override
-    public boolean isPermissionSet(Permission perm) {
+    public boolean isPermissionSet(@NotNull Permission perm) {
         return true;
     }
 
     @Override
-    public boolean hasPermission(String name) {
+    public boolean hasPermission(@NotNull String name) {
         return true;
     }
 
     @Override
-    public boolean hasPermission(Permission perm) {
+    public boolean hasPermission(@NotNull Permission perm) {
         return true;
     }
 
     @Override
-    public PermissionAttachment addAttachment(Plugin plugin, String name, boolean value) {
+    public @NotNull PermissionAttachment addAttachment(@NotNull Plugin plugin, @NotNull String name, boolean value) {
         return console.addAttachment(plugin, name, value);
     }
 
     @Override
-    public PermissionAttachment addAttachment(Plugin plugin) {
+    public @NotNull PermissionAttachment addAttachment(@NotNull Plugin plugin) {
         return console.addAttachment(plugin);
     }
 
@@ -108,7 +108,7 @@ public class CapturingConsoleSender implements ConsoleCommandSender {
     }
 
     @Override
-    public void removeAttachment(PermissionAttachment attachment) {
+    public void removeAttachment(@NotNull PermissionAttachment attachment) {
         console.removeAttachment(attachment);
     }
 
@@ -117,7 +117,7 @@ public class CapturingConsoleSender implements ConsoleCommandSender {
     }
 
     @Override
-    public Set<PermissionAttachmentInfo> getEffectivePermissions() {
+    public @NotNull Set<PermissionAttachmentInfo> getEffectivePermissions() {
         return console.getEffectivePermissions();
     }
 
