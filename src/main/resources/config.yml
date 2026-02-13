@@ -1,0 +1,4 @@
+# Discord Minecraft Connector Plugin Configuration
+
+# API URL for player verification and monitoring
+api-url: "http://localhost:8080"

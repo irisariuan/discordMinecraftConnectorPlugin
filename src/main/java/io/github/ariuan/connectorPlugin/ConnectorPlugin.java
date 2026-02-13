@@ -24,10 +24,23 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
     private static ConnectorPlugin instance;
     private LogCaptureHandler logCaptureHandler;
     private final List<BukkitTask> shutdownTask = new ArrayList<>();
+    private PlayerVerificationManager verificationManager;
+    private PlayerRestrictionListener restrictionListener;
 
     @Override
     public void onEnable() {
         instance = this;
+        
+        // Save default config
+        saveDefaultConfig();
+        
+        // Initialize verification manager
+        String apiUrl = getConfig().getString("api-url", "http://localhost:8080");
+        verificationManager = new PlayerVerificationManager(this, apiUrl);
+        
+        // Initialize restriction listener
+        restrictionListener = new PlayerRestrictionListener(verificationManager);
+        
         File logFile = new File(getDataFolder(), "log.txt");
         try {
             if (!logFile.exists() && logFile.createNewFile()) {
@@ -53,6 +66,9 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
             e.printStackTrace();
         }
         Bukkit.getPluginManager().registerEvents(this, this);
+        Bukkit.getPluginManager().registerEvents(restrictionListener, this);
+        
+        getLogger().info("Player verification system enabled with API URL: " + apiUrl);
     }
 
     public static ConnectorPlugin getInstance() {
@@ -106,11 +122,18 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         event.getPlayer().sendMessage(Component.text("Hello, " + event.getPlayer().getName() + "!"));
+        
+        // Start player verification
+        verificationManager.verifyPlayer(event.getPlayer());
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         event.getPlayer().sendMessage(Component.text("Goodbye, " + event.getPlayer().getName() + "!"));
+        
+        // Stop monitoring when player quits
+        verificationManager.stopMonitoring(event.getPlayer().getUniqueId());
+        
         Bukkit.getScheduler().runTask(getInstance(), () -> {
             int onlinePlayersCount = Bukkit.getOnlinePlayers().size();
             if (onlinePlayersCount == 0) {
@@ -128,6 +151,9 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
+        if (verificationManager != null) {
+            verificationManager.cleanup();
+        }
         if (httpServer != null){
             httpServer.stop();
         }
