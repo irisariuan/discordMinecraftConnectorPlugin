@@ -4,6 +4,8 @@
 
 This plugin implements a player verification and monitoring system that restricts player actions until they are verified via an external API. The system integrates with an external service to control player access and monitor their session time.
 
+**Architecture**: The plugin runs as a Minecraft server plugin and provides an **IPC (Inter-Process Communication)** server using Unix Domain Sockets for local communication. This allows external processes running on the same machine to interact with the Minecraft server through a REST-like API.
+
 ## Features
 
 ### Player Restrictions (Pre-Verification)
@@ -42,7 +44,34 @@ Edit `config.yml` in the plugin data folder:
 api-url: "http://localhost:8080"
 ```
 
+## IPC Server
+
+The plugin starts an IPC server using Unix Domain Sockets. The socket file is created at:
+```
+plugins/DiscordConnectorPlugin/minecraft-ipc.sock
+```
+
+### Communication Protocol
+
+The IPC server uses a REST-like protocol:
+- **Request format**: `METHOD /path\nJSON_BODY`
+- **Response format**: `STATUS_CODE\nRESPONSE_BODY`
+
+Example request:
+```
+POST /runCommand
+{"command": "list"}
+```
+
+Example response:
+```
+200
+{"success": true, "output": "There are 3 players online", "logger": ""}
+```
+
 ## API Endpoints
+
+The IPC server provides the following REST-like endpoints:
 
 ### POST /verify
 
@@ -84,6 +113,53 @@ api-url: "http://localhost:8080"
 3. Start/restart your server
 4. Edit `plugins/DiscordConnectorPlugin/config.yml` with your API URL
 5. Reload/restart the server
+6. The IPC socket will be created at `plugins/DiscordConnectorPlugin/minecraft-ipc.sock`
+
+## IPC Client Usage
+
+To communicate with the plugin from another process, you can use Unix Domain Sockets. Here's a Java example:
+
+```java
+import java.net.StandardProtocolFamily;
+import java.net.UnixDomainSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+Path socketPath = Paths.get("plugins/DiscordConnectorPlugin/minecraft-ipc.sock");
+UnixDomainSocketAddress address = UnixDomainSocketAddress.of(socketPath);
+
+try (SocketChannel channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
+    channel.connect(address);
+    
+    // Send request
+    String request = "GET /ping";
+    ByteBuffer buffer = ByteBuffer.wrap(request.getBytes(StandardCharsets.UTF_8));
+    channel.write(buffer);
+    
+    // Read response
+    buffer = ByteBuffer.allocate(8192);
+    channel.read(buffer);
+    buffer.flip();
+    String response = StandardCharsets.UTF_8.decode(buffer).toString();
+    System.out.println(response);
+}
+```
+
+For a complete working example, see `src/main/java/io/github/ariuan/connectorPlugin/example/IPCClientExample.java`.
+
+**Available IPC Endpoints:**
+- `GET /ping` - Returns "Pong!" to test connectivity
+- `GET /players` - Returns list of online players
+- `GET /logs` - Returns recent server logs
+- `GET /plugins` - Returns list of installed plugins
+- `GET /shutdown` - Schedules server shutdown (60 seconds)
+- `GET /cancelShutdown` - Cancels scheduled shutdown
+- `GET /shuttingDown` - Checks if shutdown is scheduled
+- `POST /runCommand` - Executes a Minecraft command
+- `POST /shutdown` - Schedules server shutdown with custom delay
 
 ## Technical Details
 
@@ -92,6 +168,7 @@ api-url: "http://localhost:8080"
 - **PlayerVerificationManager**: Handles API communication and player session tracking
 - **PlayerRestrictionListener**: Listens to player events and enforces restrictions
 - **ConnectorPlugin**: Main plugin class that coordinates everything
+- **IPCServer**: IPC server using Unix Domain Sockets for inter-process communication
 
 ### Event Handling
 
@@ -101,12 +178,21 @@ The plugin uses Bukkit's event system with HIGHEST priority to ensure restrictio
 
 - Verification and monitoring API calls are made asynchronously to avoid blocking the main server thread
 - Player kicks and state changes are executed on the main thread for thread safety
+- IPC server runs on a separate thread pool to handle concurrent connections
+
+### IPC vs HTTP
+
+This plugin uses IPC (Unix Domain Sockets) instead of HTTP for local communication because:
+- **Security**: Socket files can have file system permissions, limiting access to authorized processes
+- **Performance**: Unix Domain Sockets are faster than TCP/HTTP for local communication
+- **No Port Conflicts**: No need to manage port numbers
+- **Process Isolation**: Better suited for communication between processes on the same machine
 
 ## Dependencies
 
 - PaperMC API 1.21.4
-- NanoHTTPD 2.3.1
-- GSON 2.12.1
+- GSON 2.12.1 (for JSON serialization)
+- Java 21+ (for Unix Domain Socket support)
 
 ## Building
 
@@ -115,3 +201,5 @@ The plugin uses Bukkit's event system with HIGHEST priority to ensure restrictio
 ```
 
 The compiled JAR will be in `build/libs/`.
+
+**Note**: Requires Java 21 or higher to build and run due to Unix Domain Socket support. The code is compatible with Java 23 and higher.
