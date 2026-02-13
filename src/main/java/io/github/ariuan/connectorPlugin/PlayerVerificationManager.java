@@ -42,8 +42,13 @@ public class PlayerVerificationManager {
 
     private void showPlayer(Player player) {
         for (Player otherPlayer : Bukkit.getOnlinePlayers()) {
-            otherPlayer.showPlayer(plugin, player);
-            player.showPlayer(plugin, otherPlayer);
+            if (otherPlayer.getUniqueId().equals(player.getUniqueId())) {
+                continue;
+            }
+            if (playerSessions.containsKey(otherPlayer.getUniqueId()) && playerSessions.get(otherPlayer.getUniqueId()).isVerified()) {
+                otherPlayer.showPlayer(plugin, player);
+                player.showPlayer(plugin, otherPlayer);
+            }
         }
 
     }
