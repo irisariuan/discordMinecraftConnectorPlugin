@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.logging.*;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.time.Instant;
+
 import com.google.gson.*;
 
 public class LogCaptureHandler extends Handler {
@@ -43,12 +44,12 @@ public class LogCaptureHandler extends Handler {
             writer.write(gson.toJson(entry));
             writer.write("\n"); // JSON Lines format
         } catch (IOException e) {
-            e.printStackTrace();
+            ConnectorPlugin.getInstance().getLogger().warning("Error writing log: " + e.getMessage());
         }
     }
 
     public LogEntry[] getRecentLogs() {
-        return logs.toArray(new LogEntry[logs.size()]);
+        return logs.toArray(new LogEntry[0]);
     }
 
     private void loadLogsFromFile() {
@@ -61,13 +62,19 @@ public class LogCaptureHandler extends Handler {
                     LogEntry entry = gson.fromJson(line, LogEntry.class);
                     if (logs.size() == MAX_LOGS) logs.poll();
                     logs.offer(entry);
-                } catch (JsonSyntaxException ignored) {}
+                } catch (JsonSyntaxException ignored) {
+                }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            ConnectorPlugin.getInstance().getLogger().warning("Error writing log: " + e.getMessage());
         }
     }
 
-    @Override public void flush() {}
-    @Override public void close() throws SecurityException {}
+    @Override
+    public void flush() {
+    }
+
+    @Override
+    public void close() throws SecurityException {
+    }
 }

@@ -3,6 +3,8 @@ package io.github.ariuan.connectorPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -24,17 +26,35 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
     private static ConnectorPlugin instance;
     private LogCaptureHandler logCaptureHandler;
     private final List<BukkitTask> shutdownTask = new ArrayList<>();
+    private PlayerVerificationManager verificationManager;
+    private PlayerRestrictionListener restrictionListener;
 
     @Override
     public void onEnable() {
         instance = this;
+
+        // Save default config
+        saveDefaultConfig();
+
+        // Initialize verification manager
+        File customConfigFile = new File(getDataFolder(), "config.yml");
+        FileConfiguration customConfig = YamlConfiguration.loadConfiguration(customConfigFile);
+        String apiUrl = customConfig.getString("api-url");
+        long periodPerRequest = customConfig.getLong("period-per-request", 36000L);
+        if (apiUrl == null) {
+            throw new IllegalStateException("Please set api-url");
+        }
+        verificationManager = new PlayerVerificationManager(this, apiUrl, periodPerRequest);
+        // Initialize restriction listener
+        restrictionListener = new PlayerRestrictionListener(verificationManager);
+
         File logFile = new File(getDataFolder(), "log.txt");
         try {
             if (!logFile.exists() && logFile.createNewFile()) {
                 getLogger().info("Created new log file");
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            getLogger().warning("Error creating log file: " + e.getMessage());
         }
 
         logCaptureHandler = new LogCaptureHandler(logFile);
@@ -50,9 +70,12 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
             httpServer = new HttpServer(6001, logCaptureHandler);
             getLogger().info("HTTP server started on port: " + 6001);
         } catch (IOException e) {
-            e.printStackTrace();
+            getLogger().warning("Error creating HTTP server: " + e.getMessage());
         }
         Bukkit.getPluginManager().registerEvents(this, this);
+        Bukkit.getPluginManager().registerEvents(restrictionListener, this);
+
+        getLogger().info("Player verification system enabled with API URL: " + apiUrl);
     }
 
     public static ConnectorPlugin getInstance() {
@@ -62,7 +85,7 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
     public boolean cancelShutdown() {
         if (shutdownTask.isEmpty()) return false;
         getLogger().info("Canceling shutdown");
-        Bukkit.broadcast(Component.text("Canceling shutdown", NamedTextColor.GREEN));
+        Bukkit.broadcast(Component.text("Cancelled shutdown", NamedTextColor.GREEN));
         for (BukkitTask task : shutdownTask) {
             if (task == null) continue;
             if (task.isCancelled()) continue;
@@ -70,6 +93,10 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
         }
         shutdownTask.clear();
         return true;
+    }
+
+    public void verifyPlayer(Player player) {
+        verificationManager.verifyPlayer(player);
     }
 
     public boolean shutdown(long tickDelay) {
@@ -106,11 +133,18 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         event.getPlayer().sendMessage(Component.text("Hello, " + event.getPlayer().getName() + "!"));
+
+        // Start player verification
+        verificationManager.verifyPlayer(event.getPlayer());
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         event.getPlayer().sendMessage(Component.text("Goodbye, " + event.getPlayer().getName() + "!"));
+
+        // Stop monitoring when player quits
+        verificationManager.stopMonitoring(event.getPlayer());
+
         Bukkit.getScheduler().runTask(getInstance(), () -> {
             int onlinePlayersCount = Bukkit.getOnlinePlayers().size();
             if (onlinePlayersCount == 0) {
@@ -128,7 +162,10 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        if (httpServer != null){
+        if (verificationManager != null) {
+            verificationManager.cleanup();
+        }
+        if (httpServer != null) {
             httpServer.stop();
         }
         if (logCaptureHandler != null) {
