@@ -49,7 +49,7 @@ public class LogCaptureHandler extends Handler {
     }
 
     public LogEntry[] getRecentLogs() {
-        return logs.toArray(new LogEntry[logs.size()]);
+        return logs.toArray(new LogEntry[0]);
     }
 
     private void loadLogsFromFile() {
