@@ -73,7 +73,7 @@ public class PlayerVerificationManager {
                         // Start monitoring task
                         startMonitoring(player);
                     } else {
-                        player.sendMessage(Component.text("You have not linked your account to Discord yet! Please use /link in the server!").color(NamedTextColor.DARK_RED));
+                        player.sendMessage(Component.text("You have not linked your account to Discord yet! Please use /link in the Discord!").color(NamedTextColor.DARK_RED));
                     }
                 });
             } catch (Exception e) {
