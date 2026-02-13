@@ -11,7 +11,6 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,7 +19,7 @@ public class PlayerVerificationManager {
     private final ConnectorPlugin plugin;
     private final String apiUrl;
     private final Map<UUID, PlayerSession> playerSessions = new ConcurrentHashMap<>();
-    private final Map<UUID, BukkitTask> monitoringTasks = new HashMap<>();
+    private final Map<UUID, BukkitTask> monitoringTasks = new ConcurrentHashMap<>();
 
     public PlayerVerificationManager(ConnectorPlugin plugin, String apiUrl) {
         this.plugin = plugin;
@@ -32,7 +31,7 @@ public class PlayerVerificationManager {
         plugin.getLogger().info("Verifying player: " + player.getName() + " (" + uuid + ")");
         
         // Create a new session for the player
-        PlayerSession session = new PlayerSession(uuid, player.getName());
+        PlayerSession session = new PlayerSession();
         playerSessions.put(uuid, session);
 
         // Call /verify endpoint asynchronously
@@ -187,14 +186,10 @@ public class PlayerVerificationManager {
     }
 
     private static class PlayerSession {
-        private final UUID uuid;
-        private final String name;
         private final long joinTime;
         private boolean verified;
 
-        public PlayerSession(UUID uuid, String name) {
-            this.uuid = uuid;
-            this.name = name;
+        public PlayerSession() {
             this.joinTime = System.currentTimeMillis();
             this.verified = false;
         }
