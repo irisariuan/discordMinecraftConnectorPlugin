@@ -150,6 +150,25 @@ try (SocketChannel channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
 
 For a complete working example, see `src/main/java/io/github/ariuan/connectorPlugin/example/IPCClientExample.java`.
 
+**Python Client Example:**
+
+A Python client is also available. See `examples/ipc_client.py` for a complete implementation:
+
+```python
+from pathlib import Path
+from examples.ipc_client import MinecraftIPCClient
+
+socket_path = Path("plugins/DiscordConnectorPlugin/minecraft-ipc.sock")
+client = MinecraftIPCClient(socket_path)
+
+# Ping the server
+print(client.ping())
+
+# Run a command
+result = client.run_command("list")
+print(result['output'])
+```
+
 **Available IPC Endpoints:**
 - `GET /ping` - Returns "Pong!" to test connectivity
 - `GET /players` - Returns list of online players
