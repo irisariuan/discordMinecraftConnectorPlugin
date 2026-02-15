@@ -128,7 +128,7 @@ public class HttpServer extends NanoHTTPD {
                         return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());
                     }
                     case "/shuttingDown": {
-                        boolean shuttingDown = ConnectorPlugin.getInstance().getShutdownManager().haveScheduledShutdown();
+                        boolean shuttingDown = ConnectorPlugin.getInstance().getShutdownManager().hasScheduledShutdown();
                         JsonObject response = new JsonObject();
                         response.addProperty("result", shuttingDown);
                         return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());

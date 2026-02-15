@@ -101,7 +101,7 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
     }
 
     public boolean haveScheduledShutdown() {
-        return shutdownManager.haveScheduledShutdown();
+        return shutdownManager.hasScheduledShutdown();
     }
 
     @EventHandler
@@ -126,7 +126,7 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
             int onlinePlayersCount = Bukkit.getOnlinePlayers().size();
             if (onlinePlayersCount == 0) {
                 // Trigger grace period shutdown when all players leave
-                shutdownManager.shutdown(20 * 60, true);
+                shutdownManager.shutdown(ShutdownManager.GRACE_PERIOD_TICKS, true);
             }
         });
     }

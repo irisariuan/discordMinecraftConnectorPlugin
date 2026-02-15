@@ -21,7 +21,7 @@ public class ShutdownManager {
     private final String apiUrl;
     private final List<BukkitTask> shutdownTasks = new ArrayList<>();
     private boolean isGracePeriodShutdown = false;
-    private static final long GRACE_PERIOD_TICKS = 20 * 60; // 60 seconds grace period
+    public static final long GRACE_PERIOD_TICKS = 20 * 60; // 60 seconds grace period
 
     public ShutdownManager(ConnectorPlugin plugin, String apiUrl) {
         this.plugin = plugin;
@@ -53,7 +53,7 @@ public class ShutdownManager {
      * @return true if shutdown was scheduled, false if already scheduled
      */
     public boolean shutdown(long tickDelay, boolean allowGracePeriod) {
-        plugin.getLogger().info("Shutting down in " + tickDelay + " tick (grace period: " + allowGracePeriod + ")");
+        plugin.getLogger().info("Shutting down in " + tickDelay + " ticks (grace period: " + allowGracePeriod + ")");
         
         if (tickDelay <= 0) {
             Bukkit.broadcast(Component.text("Shutting down server!", NamedTextColor.DARK_RED));
@@ -105,7 +105,7 @@ public class ShutdownManager {
      * Check if a shutdown is currently scheduled
      * @return true if shutdown is scheduled
      */
-    public boolean haveScheduledShutdown() {
+    public boolean hasScheduledShutdown() {
         return !shutdownTasks.isEmpty();
     }
 

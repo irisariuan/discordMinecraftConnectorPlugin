@@ -16,5 +16,6 @@ dependencies {
 }
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    // Using Java 23 as specified by the original project
+    toolchain.languageVersion.set(JavaLanguageVersion.of(23))
 }
