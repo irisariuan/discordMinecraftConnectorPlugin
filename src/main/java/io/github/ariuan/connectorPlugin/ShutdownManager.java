@@ -5,6 +5,7 @@ import com.google.gson.JsonParser;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.IOException;
@@ -30,6 +31,7 @@ public class ShutdownManager {
 
     /**
      * Cancel the scheduled shutdown
+     *
      * @return true if shutdown was cancelled, false if no shutdown was scheduled
      */
     public boolean cancelShutdown() {
@@ -48,37 +50,38 @@ public class ShutdownManager {
 
     /**
      * Schedule a shutdown with optional grace period
-     * @param tickDelay Delay in ticks before shutdown
+     *
+     * @param tickDelay        Delay in ticks before shutdown
      * @param allowGracePeriod Whether to allow grace period (for all-players-left shutdown)
      * @return true if shutdown was scheduled, false if already scheduled
      */
     public boolean shutdown(long tickDelay, boolean allowGracePeriod) {
         plugin.getLogger().info("Shutting down in " + tickDelay + " ticks (grace period: " + allowGracePeriod + ")");
-        
+
         if (tickDelay <= 0) {
             Bukkit.broadcast(Component.text("Shutting down server!", NamedTextColor.DARK_RED));
             Bukkit.getServer().shutdown();
             return true;
         }
-        
+
         if (!shutdownTasks.isEmpty()) return false;
-        
+
         isGracePeriodShutdown = allowGracePeriod;
-        
+
         if (allowGracePeriod) {
             Bukkit.broadcast(Component.text("All players left. Server will shutdown in " + (tickDelay / 20) + " seconds if no one rejoins.", NamedTextColor.YELLOW));
         } else if (tickDelay > 20 * 15) {
             long seconds = Math.floorDiv(tickDelay, 20);
             Bukkit.broadcast(Component.text("Shutting down server in " + seconds + " seconds", NamedTextColor.DARK_RED));
         }
-        
+
         if (tickDelay > 20 * 10) {
             shutdownTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 Countdown countdown = new Countdown();
                 countdown.start(10);
             }, tickDelay - 20 * 10));
         }
-        
+
         shutdownTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
             Bukkit.broadcast(Component.text("Shutting down server!", NamedTextColor.DARK_RED));
             plugin.getLogger().info("Scheduled shutting down server");
@@ -86,7 +89,7 @@ public class ShutdownManager {
             shutdownTasks.clear();
             isGracePeriodShutdown = false;
         }, tickDelay));
-        
+
         return true;
     }
 
@@ -103,6 +106,7 @@ public class ShutdownManager {
 
     /**
      * Check if a shutdown is currently scheduled
+     *
      * @return true if shutdown is scheduled
      */
     public boolean hasScheduledShutdown() {
@@ -112,16 +116,17 @@ public class ShutdownManager {
     /**
      * Cancel shutdown via API request
      * Sends a request to the API to check if cancellation is allowed
+     *
      * @return true if cancellation was successful, false otherwise
      */
-    public boolean cancelShutdownViaApi() {
+    public boolean cancelShutdownViaApi(Player player) {
         if (shutdownTasks.isEmpty()) {
             plugin.getLogger().info("No shutdown scheduled to cancel");
             return false;
         }
 
         try {
-            boolean allowed = callCancelStopEndpoint();
+            boolean allowed = callCancelStopEndpoint(player);
             if (allowed) {
                 return cancelShutdown();
             } else {
@@ -138,11 +143,12 @@ public class ShutdownManager {
 
     /**
      * Call the API cancel-stop endpoint
+     *
      * @return true if cancellation is allowed
      * @throws IOException if there's a network error
      */
-    private boolean callCancelStopEndpoint() throws IOException {
-        String endpoint = apiUrl + "/cancel-stop";
+    private boolean callCancelStopEndpoint(Player player) throws IOException {
+        String endpoint = apiUrl + "/cancelShutdown";
         URL url = URI.create(endpoint).toURL();
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
@@ -155,6 +161,8 @@ public class ShutdownManager {
 
             JsonObject json = new JsonObject();
             json.addProperty("serverPort", Bukkit.getServer().getPort());
+            json.addProperty("uuid", player.getUniqueId().toString());
+            json.addProperty("playerName", player.getName());
 
             try (OutputStream os = conn.getOutputStream()) {
                 byte[] input = json.toString().getBytes(StandardCharsets.UTF_8);

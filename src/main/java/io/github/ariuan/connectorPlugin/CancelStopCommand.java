@@ -6,6 +6,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 public class CancelStopCommand implements CommandExecutor {
@@ -30,8 +31,11 @@ public class CancelStopCommand implements CommandExecutor {
 
         // Execute the cancellation asynchronously since it makes an API call
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            boolean success = plugin.getShutdownManager().cancelShutdownViaApi();
-            
+            if (!(sender instanceof Player)) {
+                return;
+            }
+            boolean success = plugin.getShutdownManager().cancelShutdownViaApi((Player) sender);
+
             // Send result message on main thread
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (success) {
