@@ -8,6 +8,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 public class CancelStopCommand implements CommandExecutor {
     private final ConnectorPlugin plugin;
@@ -17,7 +18,7 @@ public class CancelStopCommand implements CommandExecutor {
     }
 
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NonNull [] args) {
         if (!sender.hasPermission("connector.cancelstop")) {
             sender.sendMessage(Component.text("You don't have permission to use this command", NamedTextColor.RED));
             return true;
