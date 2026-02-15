@@ -12,12 +12,9 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.logging.Handler;
 import java.util.logging.SimpleFormatter;
 
@@ -25,9 +22,9 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
     private HttpServer httpServer;
     private static ConnectorPlugin instance;
     private LogCaptureHandler logCaptureHandler;
-    private final List<BukkitTask> shutdownTask = new ArrayList<>();
     private PlayerVerificationManager verificationManager;
     private PlayerRestrictionListener restrictionListener;
+    private ShutdownManager shutdownManager;
 
     @Override
     public void onEnable() {
@@ -47,6 +44,8 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
         verificationManager = new PlayerVerificationManager(this, apiUrl, periodPerRequest);
         // Initialize restriction listener
         restrictionListener = new PlayerRestrictionListener(verificationManager);
+        // Initialize shutdown manager
+        shutdownManager = new ShutdownManager(this, apiUrl);
 
         File logFile = new File(getDataFolder(), "log.txt");
         try {
@@ -75,6 +74,9 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(this, this);
         Bukkit.getPluginManager().registerEvents(restrictionListener, this);
 
+        // Register commands
+        this.getCommand("cancelstop").setExecutor(new CancelStopCommand(this));
+
         getLogger().info("Player verification system enabled with API URL: " + apiUrl);
     }
 
@@ -82,17 +84,12 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
         return instance;
     }
 
+    public ShutdownManager getShutdownManager() {
+        return shutdownManager;
+    }
+
     public boolean cancelShutdown() {
-        if (shutdownTask.isEmpty()) return false;
-        getLogger().info("Canceling shutdown");
-        Bukkit.broadcast(Component.text("Cancelled shutdown", NamedTextColor.GREEN));
-        for (BukkitTask task : shutdownTask) {
-            if (task == null) continue;
-            if (task.isCancelled()) continue;
-            task.cancel();
-        }
-        shutdownTask.clear();
-        return true;
+        return shutdownManager.cancelShutdown();
     }
 
     public void verifyPlayer(Player player) {
@@ -100,39 +97,19 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
     }
 
     public boolean shutdown(long tickDelay) {
-        getLogger().info("Shutting down in " + tickDelay + " tick");
-        if (tickDelay <= 0) {
-            Bukkit.broadcast(Component.text("Shutting down server!", NamedTextColor.DARK_RED));
-            Bukkit.getServer().shutdown();
-            return true;
-        }
-        if (!shutdownTask.isEmpty()) return false;
-        if (tickDelay > 20 * 15) {
-            long seconds = Math.floorDiv(tickDelay, 20);
-            Bukkit.broadcast(Component.text("Shutting down server in " + seconds + " seconds", NamedTextColor.DARK_RED));
-        }
-        if (tickDelay > 20 * 10) {
-            shutdownTask.add(Bukkit.getScheduler().runTaskLater(getInstance(), () -> {
-                Countdown countdown = new Countdown();
-                countdown.start(10);
-            }, tickDelay - 20 * 10));
-        }
-        shutdownTask.add(Bukkit.getScheduler().runTaskLater(getInstance(), () -> {
-            Bukkit.broadcast(Component.text("Shutting down server!", NamedTextColor.DARK_RED));
-            getLogger().info("Scheduled shutting down server");
-            Bukkit.getServer().shutdown();
-            shutdownTask.clear();
-        }, tickDelay));
-        return true;
+        return shutdownManager.shutdown(tickDelay, false);
     }
 
     public boolean haveScheduledShutdown() {
-        return !shutdownTask.isEmpty();
+        return shutdownManager.haveScheduledShutdown();
     }
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         event.getPlayer().sendMessage(Component.text("Hello, " + event.getPlayer().getName() + "!"));
+
+        // Cancel grace period shutdown if a player rejoins
+        shutdownManager.handlePlayerRejoin();
 
         // Start player verification
         verificationManager.verifyPlayer(event.getPlayer());
@@ -148,7 +125,8 @@ public class ConnectorPlugin extends JavaPlugin implements Listener {
         Bukkit.getScheduler().runTask(getInstance(), () -> {
             int onlinePlayersCount = Bukkit.getOnlinePlayers().size();
             if (onlinePlayersCount == 0) {
-                shutdown(20 * 60);
+                // Trigger grace period shutdown when all players leave
+                shutdownManager.shutdown(20 * 60, true);
             }
         });
     }

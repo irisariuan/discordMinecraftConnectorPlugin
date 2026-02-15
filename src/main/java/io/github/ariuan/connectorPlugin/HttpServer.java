@@ -69,7 +69,7 @@ public class HttpServer extends NanoHTTPD {
                     }
                     case "/shutdown": {
                         long tickDelay = json.get("tick").getAsLong();
-                        boolean successful = ConnectorPlugin.getInstance().shutdown(tickDelay);
+                        boolean successful = ConnectorPlugin.getInstance().getShutdownManager().shutdown(tickDelay, false);
                         JsonObject response = new JsonObject();
                         response.addProperty("success", successful);
                         return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());
@@ -116,19 +116,19 @@ public class HttpServer extends NanoHTTPD {
                         return newFixedLengthResponse(Response.Status.OK, "application/json", arr.toString());
                     }
                     case "/cancelShutdown": {
-                        boolean successful = ConnectorPlugin.getInstance().cancelShutdown();
+                        boolean successful = ConnectorPlugin.getInstance().getShutdownManager().cancelShutdown();
                         JsonObject response = new JsonObject();
                         response.addProperty("success", successful);
                         return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());
                     }
                     case "/shutdown": {
-                        boolean successful = ConnectorPlugin.getInstance().shutdown(20 * 60);
+                        boolean successful = ConnectorPlugin.getInstance().getShutdownManager().shutdown(20 * 60, false);
                         JsonObject response = new JsonObject();
                         response.addProperty("success", successful);
                         return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());
                     }
                     case "/shuttingDown": {
-                        boolean shuttingDown = ConnectorPlugin.getInstance().haveScheduledShutdown();
+                        boolean shuttingDown = ConnectorPlugin.getInstance().getShutdownManager().haveScheduledShutdown();
                         JsonObject response = new JsonObject();
                         response.addProperty("result", shuttingDown);
                         return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());
