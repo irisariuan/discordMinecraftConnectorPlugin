@@ -22,6 +22,12 @@ public class CancelStopCommand implements CommandExecutor {
             return true;
         }
 
+        // Check if there's a scheduled shutdown first
+        if (!plugin.getShutdownManager().hasScheduledShutdown()) {
+            sender.sendMessage(Component.text("No shutdown is currently scheduled", NamedTextColor.YELLOW));
+            return true;
+        }
+
         // Execute the cancellation asynchronously since it makes an API call
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             boolean success = plugin.getShutdownManager().cancelShutdownViaApi();
@@ -31,7 +37,7 @@ public class CancelStopCommand implements CommandExecutor {
                 if (success) {
                     sender.sendMessage(Component.text("Shutdown cancelled successfully", NamedTextColor.GREEN));
                 } else {
-                    sender.sendMessage(Component.text("Failed to cancel shutdown", NamedTextColor.RED));
+                    sender.sendMessage(Component.text("Failed to cancel shutdown - check server logs for details", NamedTextColor.RED));
                 }
             });
         });

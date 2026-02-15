@@ -34,7 +34,7 @@ public class ShutdownManager {
      */
     public boolean cancelShutdown() {
         if (shutdownTasks.isEmpty()) return false;
-        plugin.getLogger().info("Canceling shutdown");
+        plugin.getLogger().info("Cancelling shutdown");
         Bukkit.broadcast(Component.text("Cancelled shutdown", NamedTextColor.GREEN));
         for (BukkitTask task : shutdownTasks) {
             if (task == null) continue;
@@ -96,7 +96,7 @@ public class ShutdownManager {
      */
     public void handlePlayerRejoin() {
         if (isGracePeriodShutdown && !shutdownTasks.isEmpty()) {
-            plugin.getLogger().info("Player rejoined during grace period, canceling shutdown");
+            plugin.getLogger().info("Player rejoined during grace period, cancelling shutdown");
             cancelShutdown();
         }
     }
