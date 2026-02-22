@@ -39,7 +39,7 @@ public class HttpServer extends NanoHTTPD {
                 String rawBody = body.get("postData");
                 JsonObject json = JsonParser.parseString(rawBody).getAsJsonObject();
                 switch (uri) {
-                    case "/runCommand": {
+                    case "/runCommand" -> {
                         String command = json.get("command").getAsString();
                         if (command == null) {
                             return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Bad Request, Missing command");
@@ -67,17 +67,20 @@ public class HttpServer extends NanoHTTPD {
                         String result = future.get(); // Safe because it's not the main thread
                         return newFixedLengthResponse(Response.Status.OK, "application/json", result);
                     }
-                    case "/shutdown": {
+                    case "/shutdown" -> {
                         long tickDelay = json.get("tick").getAsLong();
                         boolean successful = ConnectorPlugin.getInstance().getShutdownManager().shutdown(tickDelay, false);
                         JsonObject response = new JsonObject();
                         response.addProperty("success", successful);
                         return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());
                     }
-                    case "/register": {
+                    case "/register" -> {
                         String playerName = json.get("playerName").getAsString();
+                        String uuid = json.get("uuid").getAsString();
                         String otp = json.get("otp").getAsString();
-                        var player = ConnectorPlugin.getInstance().getServer().getPlayerExact(playerName);
+                        var player = playerName != null ?
+                                Bukkit.getServer().getPlayerExact(playerName) :
+                                Bukkit.getServer().getPlayer(UUID.fromString(uuid));
                         if (player == null) {
                             return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Player not found");
                         }
@@ -87,9 +90,9 @@ public class HttpServer extends NanoHTTPD {
                         response.addProperty("uuid", player.getUniqueId().toString());
                         return newFixedLengthResponse(Response.Status.OK, "application/json", response.toString());
                     }
-                    case "/registered": {
-                        String uuid  = json.get("uuid").getAsString();
-                        var player = ConnectorPlugin.getInstance().getServer().getPlayer(UUID.fromString(uuid));
+                    case "/registered" -> {
+                        String uuid = json.get("uuid").getAsString();
+                        var player = Bukkit.getServer().getPlayer(UUID.fromString(uuid));
                         if (player == null) {
                             return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Player not found");
                         }
