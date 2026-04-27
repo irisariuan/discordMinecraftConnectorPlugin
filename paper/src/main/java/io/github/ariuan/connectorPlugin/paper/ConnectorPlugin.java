@@ -92,6 +92,7 @@ public class ConnectorPlugin extends JavaPlugin implements Listener, IPlatformAd
         return shutdownManager;
     }
 
+    @Override
     public boolean cancelShutdown() {
         return shutdownManager.cancelShutdown();
     }

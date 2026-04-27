@@ -1,12 +1,11 @@
-package io.github.ariuan.connectorPlugin.paper;
+package io.github.ariuan.connectorPlugin.fabric;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -17,74 +16,61 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
-public class PlayerVerificationManager {
-    private final ConnectorPlugin plugin;
+public class FabricPlayerVerificationManager {
+    private final MinecraftServer server;
     private final String apiUrl;
-    private final int serverPort;
-    private final long periodTick;
+    private final long periodMs;
+    private final Logger logger;
+    private final ScheduledExecutorService scheduler;
     private final Map<UUID, PlayerSession> playerSessions = new ConcurrentHashMap<>();
-    private final Map<UUID, BukkitTask> monitoringTasks = new ConcurrentHashMap<>();
+    private final Map<UUID, ScheduledFuture<?>> monitoringTasks = new ConcurrentHashMap<>();
 
-    public PlayerVerificationManager(ConnectorPlugin plugin, String apiUrl, long periodTick) {
-        this.plugin = plugin;
+    public FabricPlayerVerificationManager(MinecraftServer server, String apiUrl, long periodTick,
+                                            Logger logger, ScheduledExecutorService scheduler) {
+        this.server = server;
         this.apiUrl = apiUrl;
-        this.serverPort = Bukkit.getServer().getPort();
-        this.periodTick = periodTick;
+        this.periodMs = periodTick * 50L;
+        this.logger = logger;
+        this.scheduler = scheduler;
     }
 
-    private void hidePlayer(Player player) {
-        for (Player other : Bukkit.getOnlinePlayers()) {
-            other.hidePlayer(plugin, player);
-            player.hidePlayer(plugin, other);
-        }
-    }
-
-    private void showPlayer(Player player) {
-        for (Player other : Bukkit.getOnlinePlayers()) {
-            if (other.getUniqueId().equals(player.getUniqueId())) continue;
-            if (playerSessions.containsKey(other.getUniqueId()) && playerSessions.get(other.getUniqueId()).isVerified()) {
-                other.showPlayer(plugin, player);
-                player.showPlayer(plugin, other);
-            }
-        }
-    }
-
-    public void verifyPlayer(Player player) {
-        UUID uuid = player.getUniqueId();
-        plugin.getLogger().info("Verifying player: " + player.getName() + " (" + uuid + ")");
-
-        hidePlayer(player);
+    public void verifyPlayer(ServerPlayer player) {
+        UUID uuid = player.getUUID();
+        logger.info("Verifying player: " + player.getName().getString() + " (" + uuid + ")");
 
         PlayerSession session = new PlayerSession();
         playerSessions.put(uuid, session);
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        scheduler.submit(() -> {
             try {
                 boolean verified = callVerifyEndpoint(player);
-
-                Bukkit.getScheduler().runTask(plugin, () -> {
+                server.submit(() -> {
                     if (verified) {
                         session.setVerified(true);
-                        player.sendMessage("Welcome back to the server!");
-                        plugin.getLogger().info("Player " + player.getName() + " verified successfully");
-                        showPlayer(player);
+                        player.sendSystemMessage(Component.literal("Welcome back to the server!"));
+                        logger.info("Player " + player.getName().getString() + " verified successfully");
                         startMonitoring(player);
                     } else {
-                        player.sendMessage(Component.text(
+                        player.sendSystemMessage(Component.literal(
                                 "You have not linked your account to Discord yet! Please use /link in the Discord!")
-                                .color(NamedTextColor.DARK_RED));
+                                .withStyle(ChatFormatting.DARK_RED));
                     }
                 });
             } catch (Exception e) {
-                plugin.getLogger().severe("Error verifying player " + player.getName() + ": " + e.getMessage());
-                Bukkit.getScheduler().runTask(plugin, () ->
-                        player.kick(Component.text("Verification error. Please try again later or contact the administrator.")));
+                logger.severe("Error verifying player " + player.getName().getString() + ": " + e.getMessage());
+                server.submit(() ->
+                    player.connection.disconnect(
+                        Component.literal("Verification error. Please try again later or contact the administrator.")));
             }
         });
     }
 
-    private boolean callVerifyEndpoint(Player player) throws IOException {
+    private boolean callVerifyEndpoint(ServerPlayer player) throws IOException {
         URL url = URI.create(apiUrl + "/verify").toURL();
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         try {
@@ -95,9 +81,9 @@ public class PlayerVerificationManager {
             conn.setReadTimeout(5000);
 
             JsonObject json = new JsonObject();
-            json.addProperty("uuid", player.getUniqueId().toString());
-            json.addProperty("playerName", player.getName());
-            json.addProperty("serverPort", serverPort);
+            json.addProperty("uuid", player.getUUID().toString());
+            json.addProperty("playerName", player.getName().getString());
+            json.addProperty("serverPort", server.getPort());
 
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(json.toString().getBytes(StandardCharsets.UTF_8));
@@ -114,49 +100,51 @@ public class PlayerVerificationManager {
         }
     }
 
-    private void startMonitoring(Player player) {
-        UUID uuid = player.getUniqueId();
+    private void startMonitoring(ServerPlayer player) {
+        UUID uuid = player.getUUID();
         PlayerSession session = playerSessions.get(uuid);
         if (session == null) return;
 
-        BukkitTask task = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
-            if (!player.isOnline()) {
+        ScheduledFuture<?> task = scheduler.scheduleAtFixedRate(() -> {
+            if (!server.getPlayerList().getPlayers().contains(player)) {
                 stopMonitoring(player);
                 return;
             }
             try {
                 boolean shouldKick = callPlayEndpoint(player, session.getOnlineTime(), false);
                 if (shouldKick) {
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        if (player.isOnline()) {
-                            player.kick(Component.text("You do not have enough credits to play on the server!"));
-                            plugin.getLogger().info("Kicked player " + player.getName() + " due to play endpoint response");
+                    server.submit(() -> {
+                        if (server.getPlayerList().getPlayers().contains(player)) {
+                            player.connection.disconnect(
+                                Component.literal("You do not have enough credits to play on the server!"));
+                            logger.info("Kicked player " + player.getName().getString() + " due to play endpoint response");
                         }
                     });
                 }
             } catch (Exception e) {
-                plugin.getLogger().warning("Error calling play endpoint for " + player.getName() + ": " + e.getMessage());
+                logger.warning("Error calling play endpoint for " + player.getName().getString() + ": " + e.getMessage());
             }
-        }, 0, periodTick);
+        }, 0, periodMs, TimeUnit.MILLISECONDS);
 
         monitoringTasks.put(uuid, task);
     }
 
-    private void sendFinalOnlineTime(Player player) {
-        UUID uuid = player.getUniqueId();
+    private void sendFinalOnlineTime(ServerPlayer player) {
+        UUID uuid = player.getUUID();
         PlayerSession session = playerSessions.get(uuid);
         if (session == null) return;
         long onlineTime = session.getOnlineTime();
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        scheduler.submit(() -> {
             try {
                 callPlayEndpoint(player, onlineTime, true);
             } catch (IOException e) {
-                plugin.getLogger().warning("Error calling play endpoint (disconnecting) for " + player.getName() + ": " + e.getMessage());
+                logger.warning("Error calling play endpoint (disconnecting) for "
+                        + player.getName().getString() + ": " + e.getMessage());
             }
         });
     }
 
-    private boolean callPlayEndpoint(Player player, long onlineTime, boolean disconnect) throws IOException {
+    private boolean callPlayEndpoint(ServerPlayer player, long onlineTime, boolean disconnect) throws IOException {
         URL url = URI.create(apiUrl + "/play").toURL();
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         try {
@@ -167,9 +155,9 @@ public class PlayerVerificationManager {
             conn.setReadTimeout(5000);
 
             JsonObject json = new JsonObject();
-            json.addProperty("uuid", player.getUniqueId().toString());
-            json.addProperty("playerName", player.getName());
-            json.addProperty("serverPort", serverPort);
+            json.addProperty("uuid", player.getUUID().toString());
+            json.addProperty("playerName", player.getName().getString());
+            json.addProperty("serverPort", server.getPort());
             json.addProperty("onlineTime", onlineTime);
             json.addProperty("disconnect", disconnect);
 
@@ -190,13 +178,11 @@ public class PlayerVerificationManager {
         }
     }
 
-    public void stopMonitoring(Player player) {
-        UUID uuid = player.getUniqueId();
+    public void stopMonitoring(ServerPlayer player) {
+        UUID uuid = player.getUUID();
         sendFinalOnlineTime(player);
-        BukkitTask task = monitoringTasks.remove(uuid);
-        if (task != null && !task.isCancelled()) {
-            task.cancel();
-        }
+        ScheduledFuture<?> task = monitoringTasks.remove(uuid);
+        if (task != null && !task.isCancelled()) task.cancel(false);
         playerSessions.remove(uuid);
     }
 
@@ -206,10 +192,8 @@ public class PlayerVerificationManager {
     }
 
     public void cleanup() {
-        for (BukkitTask task : monitoringTasks.values()) {
-            if (task != null && !task.isCancelled()) {
-                task.cancel();
-            }
+        for (ScheduledFuture<?> task : monitoringTasks.values()) {
+            if (task != null && !task.isCancelled()) task.cancel(false);
         }
         monitoringTasks.clear();
         playerSessions.clear();
@@ -219,11 +203,8 @@ public class PlayerVerificationManager {
         private final long joinTime = System.currentTimeMillis();
         private volatile boolean verified = false;
 
-        public long getOnlineTime() {
-            return System.currentTimeMillis() - joinTime;
-        }
-
+        public long getOnlineTime() { return System.currentTimeMillis() - joinTime; }
         public boolean isVerified() { return verified; }
-        public void setVerified(boolean verified) { this.verified = verified; }
+        public void setVerified(boolean v) { this.verified = v; }
     }
 }

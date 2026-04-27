@@ -1,5 +1,5 @@
 plugins {
-    id("fabric-loom") version "1.9-SNAPSHOT"
+    id("fabric-loom") version "1.8"
     id("com.gradleup.shadow") version "8.3.5"
 }
 

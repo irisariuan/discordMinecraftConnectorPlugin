@@ -1,1 +1,1 @@
-// Root project – each subproject configures itself
+// Root project -- each subproject configures itself

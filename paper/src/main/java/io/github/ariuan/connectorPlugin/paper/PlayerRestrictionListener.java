@@ -13,7 +13,6 @@ import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.inventory.Inventory;
 
 public class PlayerRestrictionListener implements Listener {
     private final PlayerVerificationManager verificationManager;
@@ -100,8 +99,8 @@ public class PlayerRestrictionListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInventoryChange(InventoryClickEvent event) {
-        Inventory inventory = event.getInventory();
-        if (inventory instanceof Player player && !verificationManager.isVerified(player.getUniqueId())) {
+        var player = event.getWhoClicked();
+        if (!verificationManager.isVerified(player.getUniqueId())) {
             event.setCancelled(true);
             Bukkit.getScheduler().runTask(ConnectorPlugin.getInstance(), player::closeInventory);
         }

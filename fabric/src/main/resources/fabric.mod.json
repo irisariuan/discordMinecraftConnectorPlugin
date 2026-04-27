@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "discordconnector",
+  "version": "${version}",
+  "name": "Discord Connector",
+  "description": "A Fabric server mod that connects to a Discord bot, providing player verification, shutdown management, and remote command execution.",
+  "authors": ["Ariuan"],
+  "contact": {
+    "homepage": "https://github.com/irisariuan"
+  },
+  "license": "MIT",
+  "environment": "server",
+  "entrypoints": {
+    "main": ["io.github.ariuan.connectorPlugin.fabric.ConnectorMod"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "minecraft": "~1.21.4"
+  }
+}
