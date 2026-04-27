@@ -1,0 +1,5 @@
+# Default configuration for DiscordConnectorPlugin
+# api-url: The base URL of the Discord connector API (required)
+api-url: ""
+# period-per-request: How often to check player credits, in ticks (default 30 minutes)
+period-per-request: 36000

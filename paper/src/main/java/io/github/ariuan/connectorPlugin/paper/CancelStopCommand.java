@@ -1,0 +1,49 @@
+package io.github.ariuan.connectorPlugin.paper;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
+
+public class CancelStopCommand implements CommandExecutor {
+    private final ConnectorPlugin plugin;
+
+    public CancelStopCommand(ConnectorPlugin plugin) {
+        this.plugin = plugin;
+    }
+
+    @Override
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NonNull [] args) {
+        if (!sender.hasPermission("connector.cancelstop")) {
+            sender.sendMessage(Component.text("You don't have permission to use this command", NamedTextColor.RED));
+            return true;
+        }
+
+        if (!plugin.getShutdownManager().hasScheduledShutdown()) {
+            sender.sendMessage(Component.text("No shutdown is currently scheduled", NamedTextColor.YELLOW));
+            return true;
+        }
+
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            if (!(sender instanceof Player)) {
+                return;
+            }
+            boolean success = plugin.getShutdownManager().cancelShutdownViaApi((Player) sender);
+
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (success) {
+                    sender.sendMessage(Component.text("Shutdown cancelled successfully", NamedTextColor.GREEN));
+                } else {
+                    sender.sendMessage(Component.text("Failed to cancel shutdown - check server logs for details", NamedTextColor.RED));
+                }
+            });
+        });
+
+        return true;
+    }
+}
