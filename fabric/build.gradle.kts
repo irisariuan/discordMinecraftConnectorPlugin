@@ -1,25 +1,26 @@
 plugins {
-    id("fabric-loom") version "1.8"
-    id("com.gradleup.shadow") version "8.3.5"
+    id("fabric-loom") version "1.16-SNAPSHOT"
+    id("com.gradleup.shadow") version "9.4.1"
 }
 
 version = "1.0.0"
 group = "io.github.ariuan"
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(23))
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
     maven { url = uri("https://maven.fabricmc.net/") }
 }
 
 dependencies {
-    minecraft("com.mojang:minecraft:1.21.4")
+    minecraft("com.mojang:minecraft:1.21.11")
     mappings(loom.officialMojangMappings())
-    modImplementation("net.fabricmc:fabric-loader:0.16.9")
-    modImplementation("net.fabricmc.fabric-api:fabric-api:0.114.1+1.21.4")
+    modImplementation("net.fabricmc:fabric-loader:0.19.2")
+    modImplementation("net.fabricmc.fabric-api:fabric-api:0.141.3+1.21.11")
 
     // Bundle common + NanoHTTPD using Fabric's Jar-in-Jar; Gson is provided by MC
     include(project(":common"))

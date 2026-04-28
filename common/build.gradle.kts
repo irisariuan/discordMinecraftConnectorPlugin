@@ -1,6 +1,10 @@
 plugins {
     java
+    `maven-publish`
 }
+
+group = "io.github.ariuan"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
@@ -8,6 +12,14 @@ repositories {
 
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            from(components["java"])
+        }
+    }
 }
 
 dependencies {

@@ -1,6 +1,6 @@
 plugins {
-    id("net.neoforged.gradle.userdev") version "7.0.145"
-    id("com.gradleup.shadow") version "8.3.5"
+    id("net.neoforged.gradle.userdev") version "7.1.25"
+    id("com.gradleup.shadow") version "9.4.1"
 }
 
 version = "1.0.0"
@@ -10,8 +10,14 @@ java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }
 
+repositories {
+    maven { url = uri("https://libraries.minecraft.net/") }
+    maven { url = uri("https://maven.neoforged.net/releases") }
+    mavenCentral()
+}
+
 dependencies {
-    implementation("net.neoforged:neoforge:21.4.62-beta")
+    implementation("net.neoforged:neoforge:21.11.42")
     // Bundle common into the final jar via shadow
     shadow(project(":common"))
 }
@@ -36,7 +42,7 @@ tasks.build {
 
 tasks.withType<ProcessResources> {
     inputs.property("version", version)
-    filesMatching("META-INF/mods.toml") {
+    filesMatching("META-INF/neoforge.mods.toml") {
         expand("version" to version)
     }
 }

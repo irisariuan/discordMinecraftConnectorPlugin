@@ -1,28 +1,28 @@
 modLoader="javafml"
-loaderVersion="[4,)"
+loaderVersion="[1,)"
 license="MIT"
 
 [[mods]]
     modId="discordconnector"
     version="${version}"
     displayName="Discord Connector"
-    description="""
+    description='''
 A Minecraft server mod that connects to a Discord bot,
 providing player verification, shutdown management, and remote command execution.
-"""
+'''
     authors="Ariuan"
     displayURL="https://github.com/irisariuan"
 
 [[dependencies.discordconnector]]
     modId="neoforge"
     type="required"
-    versionRange="[21.4,)"
+    versionRange="[21.11.42,)"
     ordering="NONE"
-    side="SERVER"
+    side="BOTH"
 
 [[dependencies.discordconnector]]
     modId="minecraft"
     type="required"
-    versionRange="[1.21.4,)"
+    versionRange="[1.21.11,1.22)"
     ordering="NONE"
-    side="SERVER"
+    side="BOTH"

@@ -2,6 +2,7 @@ pluginManagement {
     repositories {
         maven { url = uri("https://maven.neoforged.net/releases") }
         maven { url = uri("https://maven.fabricmc.net/") }
+        maven { url = uri("https://libraries.minecraft.net/") }
         gradlePluginPortal()
         mavenCentral()
     }
@@ -9,4 +10,3 @@ pluginManagement {
 
 rootProject.name = "minecraftDiscordConnector"
 include("common", "paper", "forge", "fabric")
-
