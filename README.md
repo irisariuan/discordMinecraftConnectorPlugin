@@ -106,9 +106,16 @@ The plugin uses Bukkit's event system with HIGHEST priority to ensure restrictio
 
 ## Dependencies
 
-- PaperMC API 1.21.4
-- NanoHTTPD 2.3.1
+- PaperMC API 1.21.11
+- NanoHTTPD 2.2.0
 - GSON 2.12.1
+
+## Multi-Platform Support
+
+This plugin is available for three Minecraft server platforms:
+- **Paper/Bukkit** (Minecraft 1.21.11)
+- **NeoForge** (Minecraft 1.21.11)
+- **Fabric** (Minecraft 1.21.11)
 
 ## Building
 
@@ -116,4 +123,11 @@ The plugin uses Bukkit's event system with HIGHEST priority to ensure restrictio
 ./gradlew clean build
 ```
 
-The compiled JAR will be in `build/libs/`.
+The compiled JARs will be in:
+- Paper: `paper/build/libs/`
+- Forge: `forge/build/libs/`
+- Fabric: `fabric/build/libs/`
+
+## CI/CD
+
+This project uses GitHub Actions to automatically build all three platform versions on every commit. Artifacts are available in the Actions tab.
