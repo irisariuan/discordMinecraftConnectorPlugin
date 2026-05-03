@@ -1,10 +1,10 @@
 package io.github.ariuan.connectorPlugin.fabric;
 
-import net.minecraft.commands.CommandOutput;
+import net.minecraft.commands.CommandSource;
 import net.minecraft.network.chat.Component;
 
-/** Captures command output written to a {@link CommandOutput}. */
-public class CapturingCommandOutput implements CommandOutput {
+/** Captures command output written to a {@link CommandSource}. */
+public class CapturingCommandOutput implements CommandSource {
     private final StringBuilder sb = new StringBuilder();
 
     public String getOutput() {

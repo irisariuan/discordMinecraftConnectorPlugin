@@ -183,14 +183,14 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
             CommandSourceStack source = server.createCommandSourceStack()
                     .withSource(capturing)
                     .withPermission(4);
-            int result = server.getCommands().performPrefixedCommand(source, command);
+            server.getCommands().performPrefixedCommand(source, command);
 
             try { Thread.sleep(100); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
 
             String output = capturing.getOutput();
             String loggerOutput = logCapture.getCapturedOutput();
             logger.removeHandler(logCapture);
-            future.complete(new CommandResult(result > 0, output.trim(), loggerOutput.trim()));
+            future.complete(new CommandResult(!output.isEmpty() || !loggerOutput.isEmpty(), output.trim(), loggerOutput.trim()));
         });
         try {
             return future.get();

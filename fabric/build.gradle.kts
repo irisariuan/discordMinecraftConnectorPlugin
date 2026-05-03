@@ -26,6 +26,7 @@ dependencies {
     include(project(":common"))
     implementation(project(":common"))
     include("org.nanohttpd:nanohttpd:2.2.0")
+    implementation("org.nanohttpd:nanohttpd:2.2.0")
 }
 
 tasks.processResources {

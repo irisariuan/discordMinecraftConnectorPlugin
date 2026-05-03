@@ -16,7 +16,7 @@ public class FabricCancelStopCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, ConnectorMod mod) {
         dispatcher.register(
             Commands.literal("cancelstop")
-                .requires(source -> source.hasPermission(2))
+                .requires(source -> source.getPermissionLevel() >= 2)
                 .executes(ctx -> {
                     CommandSourceStack source = ctx.getSource();
                     FabricShutdownManager shutdownManager = mod.getShutdownManager();
