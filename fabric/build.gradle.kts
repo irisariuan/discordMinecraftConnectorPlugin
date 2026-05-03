@@ -24,7 +24,7 @@ dependencies {
 
     // Bundle common + NanoHTTPD using Fabric's Jar-in-Jar; Gson is provided by MC
     include(project(":common"))
-    modImplementation(project(":common"))
+    implementation(project(":common"))
     include("org.nanohttpd:nanohttpd:2.2.0")
 }
 
