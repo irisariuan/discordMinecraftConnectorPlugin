@@ -1,162 +1,55 @@
 package io.github.ariuan.connectorPlugin.paper;
 
-import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
-import org.bukkit.command.ConsoleCommandSender;
-import org.bukkit.conversations.Conversation;
-import org.bukkit.conversations.ConversationAbandonedEvent;
-import org.bukkit.permissions.*;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.Server;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.bukkit.command.CommandSender;
 
-import java.util.Set;
-import java.util.UUID;
+/**
+ * Captures the text output produced by a dispatched command.
+ *
+ * <p>Uses {@link Bukkit#createCommandSender(java.util.function.Consumer)} so
+ * no deprecated {@code ConsoleCommandSender} / {@code Conversable} interface
+ * needs to be implemented. The returned sender has the same effective
+ * permissions as the real console sender.</p>
+ *
+ * <p>Usage:
+ * <pre>{@code
+ *   CapturingConsoleSender cap = new CapturingConsoleSender();
+ *   Bukkit.dispatchCommand(cap.asSender(), "say hello");
+ *   String output = cap.getOutput();
+ * }</pre>
+ * </p>
+ */
+public final class CapturingConsoleSender {
 
-public class CapturingConsoleSender implements ConsoleCommandSender {
+	private final StringBuilder output = new StringBuilder();
+	private final CommandSender sender;
 
-    private final StringBuilder output = new StringBuilder();
-    private final ConsoleCommandSender console = Bukkit.getConsoleSender();
+	public CapturingConsoleSender() {
+		this.sender = Bukkit.createCommandSender(component ->
+			output
+				.append(
+					PlainTextComponentSerializer.plainText().serialize(
+						component
+					)
+				)
+				.append('\n')
+		);
+	}
 
-    public String getOutput() {
-        return output.toString();
-    }
+	/**
+	 * Returns the underlying {@link CommandSender} to pass to
+	 * {@link Bukkit#dispatchCommand(CommandSender, String)}.
+	 */
+	public CommandSender asSender() {
+		return sender;
+	}
 
-    @Override
-    public void sendMessage(@NotNull String message) {
-        output.append(message).append("\n");
-        console.sendMessage(message);
-    }
-
-    @Override
-    public void sendMessage(String[] messages) {
-        for (String msg : messages) {
-            sendMessage(msg);
-        }
-    }
-
-    @Override
-    public void sendMessage(UUID sender, @NotNull String message) {
-        sendMessage(message);
-    }
-
-    @Override
-    public void sendMessage(@Nullable UUID sender, @NotNull String... messages) {
-    }
-
-    @Override
-    public @NotNull Server getServer() {
-        return console.getServer();
-    }
-
-    @Override
-    public @NotNull String getName() {
-        return "CapturedConsole";
-    }
-
-    @Override
-    public @NotNull Spigot spigot() {
-        return console.spigot();
-    }
-
-    @Override
-    public @NotNull Component name() {
-        return Component.text("Discord Console");
-    }
-
-    @Override
-    public boolean isPermissionSet(@NotNull String name) {
-        return true;
-    }
-
-    @Override
-    public boolean isPermissionSet(@NotNull Permission perm) {
-        return true;
-    }
-
-    @Override
-    public boolean hasPermission(@NotNull String name) {
-        return true;
-    }
-
-    @Override
-    public boolean hasPermission(@NotNull Permission perm) {
-        return true;
-    }
-
-    @Override
-    public @NotNull PermissionAttachment addAttachment(@NotNull Plugin plugin, @NotNull String name, boolean value) {
-        return console.addAttachment(plugin, name, value);
-    }
-
-    @Override
-    public @NotNull PermissionAttachment addAttachment(@NotNull Plugin plugin) {
-        return console.addAttachment(plugin);
-    }
-
-    @Override
-    public @Nullable PermissionAttachment addAttachment(@NotNull Plugin plugin, @NotNull String name, boolean value, int ticks) {
-        return null;
-    }
-
-    @Override
-    public @Nullable PermissionAttachment addAttachment(@NotNull Plugin plugin, int ticks) {
-        return null;
-    }
-
-    @Override
-    public void removeAttachment(@NotNull PermissionAttachment attachment) {
-        console.removeAttachment(attachment);
-    }
-
-    @Override
-    public void recalculatePermissions() {
-    }
-
-    @Override
-    public @NotNull Set<PermissionAttachmentInfo> getEffectivePermissions() {
-        return console.getEffectivePermissions();
-    }
-
-    @Override
-    public boolean isOp() {
-        return true;
-    }
-
-    @Override
-    public void setOp(boolean value) {
-    }
-
-    @Override
-    public boolean isConversing() {
-        return false;
-    }
-
-    @Override
-    public void acceptConversationInput(@NotNull String input) {
-    }
-
-    @Override
-    public boolean beginConversation(@NotNull Conversation conversation) {
-        return false;
-    }
-
-    @Override
-    public void abandonConversation(@NotNull Conversation conversation) {
-    }
-
-    @Override
-    public void abandonConversation(@NotNull Conversation conversation, @NotNull ConversationAbandonedEvent details) {
-    }
-
-    @Override
-    public void sendRawMessage(@NotNull String message) {
-        sendMessage(message);
-    }
-
-    @Override
-    public void sendRawMessage(@Nullable UUID sender, @NotNull String message) {
-        sendMessage(sender, message);
-    }
+	/**
+	 * Returns everything sent to this sender since construction,
+	 * with each message on its own line.
+	 */
+	public String getOutput() {
+		return output.toString();
+	}
 }

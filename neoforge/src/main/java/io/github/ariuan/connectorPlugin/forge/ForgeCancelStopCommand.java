@@ -1,4 +1,4 @@
-package io.github.ariuan.connectorPlugin.fabric;
+package io.github.ariuan.connectorPlugin.forge;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.ChatFormatting;
@@ -6,12 +6,13 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.server.permission.PermissionAPI;
 
 /**
- * Registers the {@code /cancelstop} command via Brigadier (Fabric).
+ * Registers the {@code /cancelstop} command via Brigadier (NeoForge).
  * Requires the sender to be a player with at least OP level 2.
  */
-public class FabricCancelStopCommand {
+public class ForgeCancelStopCommand {
 
 	public static void register(
 		CommandDispatcher<CommandSourceStack> dispatcher,
@@ -20,18 +21,18 @@ public class FabricCancelStopCommand {
 		dispatcher.register(
 			Commands.literal("cancelstop")
 				.requires(source -> {
-					// MC 1.21.11: hasPermission(int) removed; canUseGameMasterBlocks() checks op level >= 2
-					if (
-						source.getEntity() instanceof
-							net.minecraft.server.level.ServerPlayer player
-					) {
-						return player.canUseGameMasterBlocks();
+					// Use NeoForge PermissionAPI — falls back to canUseGameMasterBlocks() by default
+					if (source.getEntity() instanceof ServerPlayer player) {
+						return PermissionAPI.getPermission(
+							player,
+							ConnectorMod.PERM_CANCEL_STOP
+						);
 					}
 					return true; // console / non-player sources always have access
 				})
 				.executes(ctx -> {
 					CommandSourceStack source = ctx.getSource();
-					FabricShutdownManager shutdownManager =
+					ForgeShutdownManager shutdownManager =
 						mod.getShutdownManager();
 
 					if (!shutdownManager.hasScheduledShutdown()) {
@@ -55,6 +56,7 @@ public class FabricCancelStopCommand {
 						return 0;
 					}
 
+					// Run the API call asynchronously to avoid blocking the main thread
 					mod.runAsync(() -> {
 						boolean success = shutdownManager.cancelShutdownViaApi(
 							player

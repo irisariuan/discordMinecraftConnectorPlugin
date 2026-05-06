@@ -1,4 +1,4 @@
-package io.github.ariuan.connectorPlugin.fabric;
+package io.github.ariuan.connectorPlugin.forge;
 
 import net.minecraft.commands.CommandSource;
 import net.minecraft.network.chat.Component;

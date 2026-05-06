@@ -28,6 +28,10 @@ dependencies {
     include("org.nanohttpd:nanohttpd:2.2.0")
 }
 
+tasks.shadowJar {
+    isZip64 = true
+}
+
 tasks.processResources {
     inputs.property("version", version)
     filesMatching("fabric.mod.json") {

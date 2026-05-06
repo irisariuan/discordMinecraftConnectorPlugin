@@ -18,6 +18,10 @@ repositories {
 
 dependencies {
     implementation("net.neoforged:neoforge:21.11.42")
+    // :common must be on compile classpath so NanoHTTPD (transitive) is visible to the IDE
+    implementation(project(":common"))
+    // Direct compileOnly for NanoHTTPD ensures stop() and other inherited methods resolve
+    compileOnly("org.nanohttpd:nanohttpd:2.2.0")
     // Bundle common into the final jar via shadow
     shadow(project(":common"))
 }

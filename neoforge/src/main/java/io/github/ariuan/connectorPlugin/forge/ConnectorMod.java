@@ -1,4 +1,4 @@
-package io.github.ariuan.connectorPlugin.fabric;
+package io.github.ariuan.connectorPlugin.forge;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -14,20 +14,37 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
-import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
+import net.neoforged.neoforge.server.permission.nodes.PermissionTypes;
 
-public class ConnectorMod implements ModInitializer, IPlatformAdapter {
+@Mod(ConnectorMod.MOD_ID)
+public class ConnectorMod implements IPlatformAdapter {
 
 	public static final String MOD_ID = "discordconnector";
 	private static ConnectorMod INSTANCE;
+
+	/** Permission node for the /cancelstop command (default: operators only). */
+	public static final PermissionNode<Boolean> PERM_CANCEL_STOP =
+		new PermissionNode<>(
+			MOD_ID,
+			"command.cancelstop",
+			PermissionTypes.BOOLEAN,
+			(player, uuid, ctx) ->
+				player != null && player.canUseGameMasterBlocks()
+		);
 
 	private final Logger logger = Logger.getLogger(MOD_ID);
 	private final ScheduledExecutorService scheduler =
@@ -36,82 +53,23 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
 	private MinecraftServer server;
 	private HttpServer httpServer;
 	private LogCaptureHandler logCaptureHandler;
-	private FabricPlayerVerificationManager verificationManager;
-	private FabricShutdownManager shutdownManager;
-	private FabricPlayerRestrictionHandler restrictionHandler;
+	private ForgePlayerVerificationManager verificationManager;
+	private ForgeShutdownManager shutdownManager;
+	private ForgePlayerRestrictionHandler restrictionHandler;
+
+	public ConnectorMod(IEventBus modEventBus) {
+		INSTANCE = this;
+		NeoForge.EVENT_BUS.register(this);
+	}
 
 	public static ConnectorMod getInstance() {
 		return INSTANCE;
 	}
 
-	@Override
-	public void onInitialize() {
-		INSTANCE = this;
+	@SubscribeEvent
+	public void onServerStarted(ServerStartedEvent event) {
+		this.server = event.getServer();
 
-		ServerLifecycleEvents.SERVER_STARTED.register(srv -> {
-			this.server = srv;
-			startPlugin();
-		});
-
-		ServerLifecycleEvents.SERVER_STOPPING.register(srv -> {
-			if (verificationManager != null) verificationManager.cleanup();
-			if (httpServer != null) httpServer.stop();
-			if (logCaptureHandler != null) logger.removeHandler(
-				logCaptureHandler
-			);
-			scheduler.shutdownNow();
-		});
-
-		ServerPlayConnectionEvents.JOIN.register((handler, sender, srv) -> {
-			ServerPlayer player = handler.getPlayer();
-			player.sendSystemMessage(
-				Component.literal(
-					"Hello, " + player.getName().getString() + "!"
-				)
-			);
-			if (shutdownManager != null) shutdownManager.handlePlayerRejoin();
-			if (
-				restrictionHandler != null
-			) restrictionHandler.recordJoinPosition(player);
-			if (verificationManager != null) verificationManager.verifyPlayer(
-				player
-			);
-		});
-
-		ServerPlayConnectionEvents.DISCONNECT.register((handler, srv) -> {
-			ServerPlayer player = handler.getPlayer();
-			player.sendSystemMessage(
-				Component.literal(
-					"Goodbye, " + player.getName().getString() + "!"
-				)
-			);
-			if (restrictionHandler != null) restrictionHandler.clearFreezeData(
-				player.getUUID()
-			);
-			if (verificationManager != null) verificationManager.stopMonitoring(
-				player
-			);
-
-			srv.submit(() -> {
-				if (
-					srv.getPlayerList().getPlayers().isEmpty() &&
-					shutdownManager != null
-				) {
-					shutdownManager.shutdown(
-						FabricShutdownManager.GRACE_PERIOD_TICKS,
-						true
-					);
-				}
-			});
-		});
-
-		CommandRegistrationCallback.EVENT.register(
-			(dispatcher, registryAccess, environment) ->
-				FabricCancelStopCommand.register(dispatcher, this)
-		);
-	}
-
-	private void startPlugin() {
 		String apiUrl = readConfig("api-url");
 		if (apiUrl == null || apiUrl.isEmpty()) {
 			logger.severe(
@@ -127,28 +85,29 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
 			} catch (NumberFormatException ignored) {}
 		}
 
-		verificationManager = new FabricPlayerVerificationManager(
+		verificationManager = new ForgePlayerVerificationManager(
 			server,
 			apiUrl,
 			periodPerRequest,
 			logger,
 			scheduler
 		);
-		shutdownManager = new FabricShutdownManager(
+		restrictionHandler = new ForgePlayerRestrictionHandler(
+			verificationManager
+		);
+		shutdownManager = new ForgeShutdownManager(
 			server,
 			apiUrl,
 			logger,
 			scheduler
 		);
-		restrictionHandler = new FabricPlayerRestrictionHandler(
-			verificationManager
-		);
-		restrictionHandler.register(server);
 
-		File logFile = FabricLoader.getInstance()
-			.getGameDir()
-			.resolve("discordconnector/log.txt")
-			.toFile();
+		NeoForge.EVENT_BUS.register(restrictionHandler);
+
+		File logFile = new File(
+			server.getServerDirectory().toFile(),
+			"discordconnector/log.txt"
+		);
 		logFile.getParentFile().mkdirs();
 		try {
 			if (!logFile.exists()) logFile.createNewFile();
@@ -171,6 +130,76 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
 		);
 	}
 
+	@SubscribeEvent
+	public void onServerStopping(ServerStoppingEvent event) {
+		if (verificationManager != null) verificationManager.cleanup();
+		if (httpServer != null) httpServer.stop();
+		if (logCaptureHandler != null) logger.removeHandler(logCaptureHandler);
+		scheduler.shutdownNow();
+	}
+
+	@SubscribeEvent
+	public void onRegisterCommands(RegisterCommandsEvent event) {
+		ForgeCancelStopCommand.register(event.getDispatcher(), this);
+	}
+
+	@SubscribeEvent
+	public void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
+		if (!(event.getEntity() instanceof ServerPlayer player)) return;
+		player.sendSystemMessage(
+			Component.literal("Hello, " + player.getName().getString() + "!")
+		);
+		if (shutdownManager != null) shutdownManager.handlePlayerRejoin();
+		if (verificationManager != null) verificationManager.verifyPlayer(
+			player
+		);
+	}
+
+	@SubscribeEvent
+	public void onPlayerQuit(PlayerEvent.PlayerLoggedOutEvent event) {
+		if (!(event.getEntity() instanceof ServerPlayer player)) return;
+		player.sendSystemMessage(
+			Component.literal("Goodbye, " + player.getName().getString() + "!")
+		);
+		if (verificationManager != null) verificationManager.stopMonitoring(
+			player
+		);
+
+		server.submit(() -> {
+			if (
+				server.getPlayerList().getPlayers().isEmpty() &&
+				shutdownManager != null
+			) {
+				shutdownManager.shutdown(
+					ForgeShutdownManager.GRACE_PERIOD_TICKS,
+					true
+				);
+			}
+		});
+	}
+
+	@SubscribeEvent
+	public void onPlayerDeath(LivingDeathEvent event) {
+		if (!(event.getEntity() instanceof ServerPlayer player)) return;
+		var pos = player.blockPosition();
+		server
+			.getPlayerList()
+			.broadcastSystemMessage(
+				Component.literal(
+					"Grab " +
+						player.getName().getString() +
+						" items at " +
+						pos.getX() +
+						", " +
+						pos.getY() +
+						", " +
+						pos.getZ() +
+						"!"
+				),
+				false
+			);
+	}
+
 	// -------------------------------------------------------------------------
 	// IPlatformAdapter
 	// -------------------------------------------------------------------------
@@ -185,7 +214,7 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
 		List<IPlayerInfo> result = new ArrayList<>();
 		if (server != null) {
 			for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-				result.add(new FabricPlayerInfo(p));
+				result.add(new ForgePlayerInfo(p));
 			}
 		}
 		return result;
@@ -195,14 +224,14 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
 	public IPlayerInfo getPlayerByName(String name) {
 		if (server == null) return null;
 		ServerPlayer p = server.getPlayerList().getPlayerByName(name);
-		return p != null ? new FabricPlayerInfo(p) : null;
+		return p != null ? new ForgePlayerInfo(p) : null;
 	}
 
 	@Override
 	public IPlayerInfo getPlayerByUUID(UUID uuid) {
 		if (server == null) return null;
 		ServerPlayer p = server.getPlayerList().getPlayer(uuid);
-		return p != null ? new FabricPlayerInfo(p) : null;
+		return p != null ? new ForgePlayerInfo(p) : null;
 	}
 
 	@Override
@@ -216,10 +245,7 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
 	public void markPlayerVerified(UUID playerUUID) {
 		if (server == null || verificationManager == null) return;
 		ServerPlayer p = server.getPlayerList().getPlayer(playerUUID);
-		if (p != null) {
-			restrictionHandler.clearFreezeData(playerUUID);
-			verificationManager.verifyPlayer(p);
-		}
+		if (p != null) verificationManager.verifyPlayer(p);
 	}
 
 	@Override
@@ -247,6 +273,7 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
 				result = 0;
 			}
 
+			// Brief pause to allow any async log output to flush
 			try {
 				Thread.sleep(100);
 			} catch (InterruptedException ignored) {
@@ -295,9 +322,9 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
 	@Override
 	public List<String> getLoadedComponents() {
 		List<String> names = new ArrayList<>();
-		FabricLoader.getInstance()
-			.getAllMods()
-			.forEach(m -> names.add(m.getMetadata().getId()));
+		net.neoforged.fml.ModList.get()
+			.getMods()
+			.forEach(m -> names.add(m.getModId()));
 		return names;
 	}
 
@@ -321,7 +348,7 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
 		return logCaptureHandler;
 	}
 
-	public FabricShutdownManager getShutdownManager() {
+	public ForgeShutdownManager getShutdownManager() {
 		return shutdownManager;
 	}
 
@@ -333,10 +360,10 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
 
 	private String readConfig(String key) {
 		if (configCache == null) {
-			File configFile = FabricLoader.getInstance()
-				.getGameDir()
-				.resolve("config/discordconnector/config.json")
-				.toFile();
+			File configFile = new File(
+				server.getServerDirectory().toFile(),
+				"config/discordconnector/config.json"
+			);
 			if (!configFile.exists()) {
 				configFile.getParentFile().mkdirs();
 				try (OutputStream os = new FileOutputStream(configFile)) {
@@ -379,11 +406,11 @@ public class ConnectorMod implements ModInitializer, IPlatformAdapter {
 	// Private helper
 	// -------------------------------------------------------------------------
 
-	private static class FabricPlayerInfo implements IPlayerInfo {
+	private static class ForgePlayerInfo implements IPlayerInfo {
 
 		private final ServerPlayer player;
 
-		FabricPlayerInfo(ServerPlayer player) {
+		ForgePlayerInfo(ServerPlayer player) {
 			this.player = player;
 		}
 

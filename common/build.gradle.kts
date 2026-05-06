@@ -1,5 +1,5 @@
 plugins {
-    java
+    `java-library`
     `maven-publish`
 }
 
@@ -24,6 +24,6 @@ publishing {
 
 dependencies {
     compileOnly("org.jetbrains:annotations:26.0.1")
-    implementation("org.nanohttpd:nanohttpd:2.2.0")
+    api("org.nanohttpd:nanohttpd:2.2.0")
     implementation("com.google.code.gson:gson:2.12.1")
 }
