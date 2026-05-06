@@ -1,4 +1,4 @@
-package io.github.ariuan.connectorPlugin.forge;
+package io.github.ariuan.connectorPlugin.neoforge;
 
 import java.util.UUID;
 import net.minecraft.ChatFormatting;
@@ -19,12 +19,12 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
  * NeoForge event listener that restricts unverified players from interacting
  * with the world until their Discord account is linked.
  */
-public class ForgePlayerRestrictionHandler {
+public class NeoForgePlayerRestrictionHandler {
 
-	private final ForgePlayerVerificationManager verificationManager;
+	private final NeoForgePlayerVerificationManager verificationManager;
 
-	public ForgePlayerRestrictionHandler(
-		ForgePlayerVerificationManager verificationManager
+	public NeoForgePlayerRestrictionHandler(
+		NeoForgePlayerVerificationManager verificationManager
 	) {
 		this.verificationManager = verificationManager;
 	}

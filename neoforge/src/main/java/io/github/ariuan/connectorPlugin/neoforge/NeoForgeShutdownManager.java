@@ -1,4 +1,4 @@
-package io.github.ariuan.connectorPlugin.forge;
+package io.github.ariuan.connectorPlugin.neoforge;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -20,7 +20,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-public class ForgeShutdownManager {
+public class NeoForgeShutdownManager {
     private final MinecraftServer server;
     private final String apiUrl;
     private final Logger logger;
@@ -29,7 +29,7 @@ public class ForgeShutdownManager {
     private boolean isGracePeriodShutdown = false;
     public static final long GRACE_PERIOD_TICKS = 20 * 60;
 
-    public ForgeShutdownManager(MinecraftServer server, String apiUrl, Logger logger, ScheduledExecutorService scheduler) {
+    public NeoForgeShutdownManager(MinecraftServer server, String apiUrl, Logger logger, ScheduledExecutorService scheduler) {
         this.server = server;
         this.apiUrl = apiUrl;
         this.logger = logger;
@@ -83,7 +83,7 @@ public class ForgeShutdownManager {
         if (tickDelay > 20 * 10) {
             ScheduledFuture<?> countdownFuture = scheduler.schedule(() ->
                 server.submit(() -> {
-                    ForgeCountdown countdown = new ForgeCountdown(server, scheduler);
+                    NeoForgeCountdown countdown = new NeoForgeCountdown(server, scheduler);
                     countdown.start(10);
                 }),
                 msDelay - (20 * 10 * 50L), TimeUnit.MILLISECONDS);

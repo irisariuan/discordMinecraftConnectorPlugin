@@ -1,4 +1,4 @@
-package io.github.ariuan.connectorPlugin.forge;
+package io.github.ariuan.connectorPlugin.neoforge;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -21,7 +21,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-public class ForgePlayerVerificationManager {
+public class NeoForgePlayerVerificationManager {
     private final MinecraftServer server;
     private final String apiUrl;
     private final long periodMs;
@@ -30,8 +30,8 @@ public class ForgePlayerVerificationManager {
     private final Map<UUID, PlayerSession> playerSessions = new ConcurrentHashMap<>();
     private final Map<UUID, ScheduledFuture<?>> monitoringTasks = new ConcurrentHashMap<>();
 
-    public ForgePlayerVerificationManager(MinecraftServer server, String apiUrl, long periodTick,
-                                          Logger logger, ScheduledExecutorService scheduler) {
+    public NeoForgePlayerVerificationManager(MinecraftServer server, String apiUrl, long periodTick,
+                                             Logger logger, ScheduledExecutorService scheduler) {
         this.server = server;
         this.apiUrl = apiUrl;
         this.periodMs = periodTick * 50L;

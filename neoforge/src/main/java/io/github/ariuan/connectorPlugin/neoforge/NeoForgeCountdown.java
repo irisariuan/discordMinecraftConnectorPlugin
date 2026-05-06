@@ -1,4 +1,4 @@
-package io.github.ariuan.connectorPlugin.forge;
+package io.github.ariuan.connectorPlugin.neoforge;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -10,12 +10,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** Broadcasts a second-by-second countdown to all players and then fires a callback. */
-public class ForgeCountdown {
+public class NeoForgeCountdown {
     private final MinecraftServer server;
     private final ScheduledExecutorService scheduler;
     private ScheduledFuture<?> future;
 
-    public ForgeCountdown(MinecraftServer server, ScheduledExecutorService scheduler) {
+    public NeoForgeCountdown(MinecraftServer server, ScheduledExecutorService scheduler) {
         this.server = server;
         this.scheduler = scheduler;
     }
