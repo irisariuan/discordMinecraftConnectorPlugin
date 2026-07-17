@@ -6,7 +6,7 @@ import java.util.logging.Logger;
 
 /**
  * Platform-agnostic interface that abstracts all server operations needed by
- * the shared {@link HttpServer}.  Each platform (Paper, Forge, Fabric) provides
+ * the shared {@link HttpServer}.  Each platform (Paper, NeoForge, Fabric) provides
  * its own implementation.
  */
 public interface IPlatformAdapter {
