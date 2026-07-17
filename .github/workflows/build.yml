@@ -34,11 +34,11 @@ jobs:
         path: paper/build/libs/*.jar
         if-no-files-found: error
 
-    - name: Upload Forge Plugin Artifact
+    - name: Upload NeoForge Plugin Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: forge-plugin
-        path: forge/build/libs/*.jar
+        name: neoforge-plugin
+        path: neoforge/build/libs/*.jar
         if-no-files-found: error
 
     - name: Upload Fabric Plugin Artifact
@@ -54,6 +54,6 @@ jobs:
         name: all-plugins
         path: |
           paper/build/libs/*.jar
-          forge/build/libs/*.jar
+          neoforge/build/libs/*.jar
           fabric/build/libs/*.jar
         if-no-files-found: error

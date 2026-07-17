@@ -125,7 +125,7 @@ This plugin is available for three Minecraft server platforms:
 
 The compiled JARs will be in:
 - Paper: `paper/build/libs/`
-- Forge: `forge/build/libs/`
+- NeoForge: `neoforge/build/libs/`
 - Fabric: `fabric/build/libs/`
 
 ## CI/CD

@@ -1,4 +1,4 @@
-package io.github.ariuan.connectorPlugin.forge;
+package io.github.ariuan.connectorPlugin.neoforge;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.ChatFormatting;
@@ -12,7 +12,7 @@ import net.neoforged.neoforge.server.permission.PermissionAPI;
  * Registers the {@code /cancelstop} command via Brigadier (NeoForge).
  * Requires the sender to be a player with at least OP level 2.
  */
-public class ForgeCancelStopCommand {
+public class NeoForgeCancelStopCommand {
 
 	public static void register(
 		CommandDispatcher<CommandSourceStack> dispatcher,
@@ -32,7 +32,7 @@ public class ForgeCancelStopCommand {
 				})
 				.executes(ctx -> {
 					CommandSourceStack source = ctx.getSource();
-					ForgeShutdownManager shutdownManager =
+					NeoForgeShutdownManager shutdownManager =
 						mod.getShutdownManager();
 
 					if (!shutdownManager.hasScheduledShutdown()) {

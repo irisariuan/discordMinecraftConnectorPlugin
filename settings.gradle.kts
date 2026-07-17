@@ -9,4 +9,4 @@ pluginManagement {
 }
 
 rootProject.name = "minecraftDiscordConnector"
-include("common", "paper", "forge", "fabric")
+include("common", "paper", "neoforge", "fabric")

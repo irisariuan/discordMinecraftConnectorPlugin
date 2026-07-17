@@ -1,4 +1,4 @@
-package io.github.ariuan.connectorPlugin.forge;
+package io.github.ariuan.connectorPlugin.neoforge;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -53,9 +53,9 @@ public class ConnectorMod implements IPlatformAdapter {
 	private MinecraftServer server;
 	private HttpServer httpServer;
 	private LogCaptureHandler logCaptureHandler;
-	private ForgePlayerVerificationManager verificationManager;
-	private ForgeShutdownManager shutdownManager;
-	private ForgePlayerRestrictionHandler restrictionHandler;
+	private NeoForgePlayerVerificationManager verificationManager;
+	private NeoForgeShutdownManager shutdownManager;
+	private NeoForgePlayerRestrictionHandler restrictionHandler;
 
 	public ConnectorMod(IEventBus modEventBus) {
 		INSTANCE = this;
@@ -85,17 +85,17 @@ public class ConnectorMod implements IPlatformAdapter {
 			} catch (NumberFormatException ignored) {}
 		}
 
-		verificationManager = new ForgePlayerVerificationManager(
+		verificationManager = new NeoForgePlayerVerificationManager(
 			server,
 			apiUrl,
 			periodPerRequest,
 			logger,
 			scheduler
 		);
-		restrictionHandler = new ForgePlayerRestrictionHandler(
+		restrictionHandler = new NeoForgePlayerRestrictionHandler(
 			verificationManager
 		);
-		shutdownManager = new ForgeShutdownManager(
+		shutdownManager = new NeoForgeShutdownManager(
 			server,
 			apiUrl,
 			logger,
@@ -140,7 +140,7 @@ public class ConnectorMod implements IPlatformAdapter {
 
 	@SubscribeEvent
 	public void onRegisterCommands(RegisterCommandsEvent event) {
-		ForgeCancelStopCommand.register(event.getDispatcher(), this);
+		NeoForgeCancelStopCommand.register(event.getDispatcher(), this);
 	}
 
 	@SubscribeEvent
@@ -171,7 +171,7 @@ public class ConnectorMod implements IPlatformAdapter {
 				shutdownManager != null
 			) {
 				shutdownManager.shutdown(
-					ForgeShutdownManager.GRACE_PERIOD_TICKS,
+					NeoForgeShutdownManager.GRACE_PERIOD_TICKS,
 					true
 				);
 			}
@@ -214,7 +214,7 @@ public class ConnectorMod implements IPlatformAdapter {
 		List<IPlayerInfo> result = new ArrayList<>();
 		if (server != null) {
 			for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-				result.add(new ForgePlayerInfo(p));
+				result.add(new NeoForgePlayerInfo(p));
 			}
 		}
 		return result;
@@ -224,14 +224,14 @@ public class ConnectorMod implements IPlatformAdapter {
 	public IPlayerInfo getPlayerByName(String name) {
 		if (server == null) return null;
 		ServerPlayer p = server.getPlayerList().getPlayerByName(name);
-		return p != null ? new ForgePlayerInfo(p) : null;
+		return p != null ? new NeoForgePlayerInfo(p) : null;
 	}
 
 	@Override
 	public IPlayerInfo getPlayerByUUID(UUID uuid) {
 		if (server == null) return null;
 		ServerPlayer p = server.getPlayerList().getPlayer(uuid);
-		return p != null ? new ForgePlayerInfo(p) : null;
+		return p != null ? new NeoForgePlayerInfo(p) : null;
 	}
 
 	@Override
@@ -348,7 +348,7 @@ public class ConnectorMod implements IPlatformAdapter {
 		return logCaptureHandler;
 	}
 
-	public ForgeShutdownManager getShutdownManager() {
+	public NeoForgeShutdownManager getShutdownManager() {
 		return shutdownManager;
 	}
 
@@ -406,11 +406,11 @@ public class ConnectorMod implements IPlatformAdapter {
 	// Private helper
 	// -------------------------------------------------------------------------
 
-	private static class ForgePlayerInfo implements IPlayerInfo {
+	private static class NeoForgePlayerInfo implements IPlayerInfo {
 
 		private final ServerPlayer player;
 
-		ForgePlayerInfo(ServerPlayer player) {
+		NeoForgePlayerInfo(ServerPlayer player) {
 			this.player = player;
 		}
 
