@@ -21,6 +21,7 @@ public class ShutdownManager {
     private final ConnectorPlugin plugin;
     private final String apiUrl;
     private final List<BukkitTask> shutdownTasks = new ArrayList<>();
+    private volatile Countdown activeCountdown;
     private boolean isGracePeriodShutdown = false;
     public static final long GRACE_PERIOD_TICKS = 20 * 60;
 
@@ -38,8 +39,21 @@ public class ShutdownManager {
             task.cancel();
         }
         shutdownTasks.clear();
+        stopCountdown();
         isGracePeriodShutdown = false;
         return true;
+    }
+
+    /**
+     * Stops the countdown broadcast. Cancelling the scheduled tasks above is not
+     * enough once the countdown has started: it drives its own repeating task.
+     */
+    private void stopCountdown() {
+        Countdown countdown = activeCountdown;
+        if (countdown != null) {
+            countdown.cancel();
+            activeCountdown = null;
+        }
     }
 
     public boolean shutdown(long tickDelay, boolean allowGracePeriod) {
@@ -67,6 +81,7 @@ public class ShutdownManager {
         if (tickDelay > 20 * 10) {
             shutdownTasks.add(Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 Countdown countdown = new Countdown();
+                activeCountdown = countdown;
                 countdown.start(10);
             }, tickDelay - 20 * 10));
         }
@@ -76,6 +91,7 @@ public class ShutdownManager {
             plugin.getLogger().info("Scheduled shutting down server");
             Bukkit.getServer().shutdown();
             shutdownTasks.clear();
+            stopCountdown();
             isGracePeriodShutdown = false;
         }, tickDelay));
 

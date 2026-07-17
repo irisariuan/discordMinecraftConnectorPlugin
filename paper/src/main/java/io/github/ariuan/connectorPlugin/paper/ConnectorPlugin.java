@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Handler;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
@@ -27,6 +28,13 @@ public class ConnectorPlugin
 	extends JavaPlugin
 	implements Listener, IPlatformAdapter
 {
+
+	/**
+	 * Cap on how long an HTTP worker waits for a command's captured output.
+	 * A command such as {@code stop} shuts the server down before the collection
+	 * task runs, so without a bound the waiting thread would never be released.
+	 */
+	private static final long COMMAND_TIMEOUT_SECONDS = 10;
 
 	private HttpServer httpServer;
 	private static ConnectorPlugin instance;
@@ -199,7 +207,7 @@ public class ConnectorPlugin
 			);
 		});
 		try {
-			return future.get();
+			return future.get(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 		} catch (Exception e) {
 			getLogger().warning(
 				"Error capturing command output: " + e.getMessage()
@@ -310,6 +318,7 @@ public class ConnectorPlugin
 		}
 		if (logCaptureHandler != null) {
 			getLogger().removeHandler(logCaptureHandler);
+			logCaptureHandler.close();
 		}
 	}
 

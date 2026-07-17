@@ -26,6 +26,7 @@ public class NeoForgeShutdownManager {
     private final Logger logger;
     private final ScheduledExecutorService scheduler;
     private final List<ScheduledFuture<?>> shutdownFutures = new ArrayList<>();
+    private volatile NeoForgeCountdown activeCountdown;
     private boolean isGracePeriodShutdown = false;
     public static final long GRACE_PERIOD_TICKS = 20 * 60;
 
@@ -46,8 +47,21 @@ public class NeoForgeShutdownManager {
             if (f != null && !f.isCancelled()) f.cancel(false);
         }
         shutdownFutures.clear();
+        stopCountdown();
         isGracePeriodShutdown = false;
         return true;
+    }
+
+    /**
+     * Stops the countdown broadcast. Cancelling the futures above is not enough
+     * once the countdown has started: it drives its own repeating future.
+     */
+    private void stopCountdown() {
+        NeoForgeCountdown countdown = activeCountdown;
+        if (countdown != null) {
+            countdown.cancel();
+            activeCountdown = null;
+        }
     }
 
     public boolean shutdown(long tickDelay, boolean allowGracePeriod) {
@@ -84,6 +98,7 @@ public class NeoForgeShutdownManager {
             ScheduledFuture<?> countdownFuture = scheduler.schedule(() ->
                 server.submit(() -> {
                     NeoForgeCountdown countdown = new NeoForgeCountdown(server, scheduler);
+                    activeCountdown = countdown;
                     countdown.start(10);
                 }),
                 msDelay - (20 * 10 * 50L), TimeUnit.MILLISECONDS);
@@ -97,6 +112,7 @@ public class NeoForgeShutdownManager {
                 logger.info("Scheduled shutting down server");
                 server.halt(false);
                 shutdownFutures.clear();
+                stopCountdown();
                 isGracePeriodShutdown = false;
             }),
             msDelay, TimeUnit.MILLISECONDS);

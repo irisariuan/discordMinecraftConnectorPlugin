@@ -1,6 +1,5 @@
 package io.github.ariuan.connectorPlugin.common;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -39,20 +38,20 @@ public class HttpServer extends NanoHTTPD {
 				String uri = session.getUri();
 				Map<String, String> body = new HashMap<>();
 				session.parseBody(body);
-				String rawBody = body.get("postData");
-				JsonObject json = JsonParser.parseString(
-					rawBody
-				).getAsJsonObject();
+				JsonObject json;
+				try {
+					json = JsonParser.parseString(
+						body.get("postData")
+					).getAsJsonObject();
+				} catch (Exception e) {
+					return badRequest("Bad Request, expected a JSON body");
+				}
 
 				switch (uri) {
 					case "/runCommand" -> {
-						String command = json.get("command").getAsString();
+						String command = optString(json, "command");
 						if (command == null) {
-							return newFixedLengthResponse(
-								Response.Status.BAD_REQUEST,
-								MIME_PLAINTEXT,
-								"Bad Request, Missing command"
-							);
+							return badRequest("Bad Request, Missing command");
 						}
 						CommandResult result = adapter.runCommandAndCapture(
 							command
@@ -64,11 +63,16 @@ public class HttpServer extends NanoHTTPD {
 						return newFixedLengthResponse(
 							Response.Status.OK,
 							"application/json",
-							new Gson().toJson(response)
+							response.toString()
 						);
 					}
 					case "/shutdown" -> {
-						long tickDelay = json.get("tick").getAsLong();
+						Long tickDelay = optLong(json, "tick");
+						if (tickDelay == null) {
+							return badRequest(
+								"Bad Request, Missing or non-numeric tick"
+							);
+						}
 						boolean successful = adapter.scheduleShutdown(
 							tickDelay,
 							false
@@ -82,25 +86,28 @@ public class HttpServer extends NanoHTTPD {
 						);
 					}
 					case "/register" -> {
-						String playerName =
-							json.has("playerName") &&
-							!json.get("playerName").isJsonNull()
-								? json.get("playerName").getAsString()
-								: null;
-						String uuid =
-							json.has("uuid") && !json.get("uuid").isJsonNull()
-								? json.get("uuid").getAsString()
-								: null;
-						String otp = json.get("otp").getAsString();
+						String playerName = optString(json, "playerName");
+						String uuid = optString(json, "uuid");
+						String otp = optString(json, "otp");
+						if (otp == null) {
+							return badRequest("Bad Request, Missing otp");
+						}
+						if (playerName == null && uuid == null) {
+							return badRequest(
+								"Bad Request, Missing playerName or uuid"
+							);
+						}
 
-						IPlayerInfo player =
-							playerName != null
-								? adapter.getPlayerByName(playerName)
-								: (uuid != null
-										? adapter.getPlayerByUUID(
-												UUID.fromString(uuid)
-											)
-										: null);
+						IPlayerInfo player;
+						if (playerName != null) {
+							player = adapter.getPlayerByName(playerName);
+						} else {
+							UUID parsed = parseUUID(uuid);
+							if (parsed == null) {
+								return badRequest("Bad Request, Invalid uuid");
+							}
+							player = adapter.getPlayerByUUID(parsed);
+						}
 						if (player == null) {
 							return newFixedLengthResponse(
 								Response.Status.BAD_REQUEST,
@@ -125,10 +132,15 @@ public class HttpServer extends NanoHTTPD {
 						);
 					}
 					case "/registered" -> {
-						String uuid = json.get("uuid").getAsString();
-						IPlayerInfo player = adapter.getPlayerByUUID(
-							UUID.fromString(uuid)
-						);
+						String uuid = optString(json, "uuid");
+						if (uuid == null) {
+							return badRequest("Bad Request, Missing uuid");
+						}
+						UUID parsed = parseUUID(uuid);
+						if (parsed == null) {
+							return badRequest("Bad Request, Invalid uuid");
+						}
+						IPlayerInfo player = adapter.getPlayerByUUID(parsed);
 						if (player == null) {
 							return newFixedLengthResponse(
 								Response.Status.BAD_REQUEST,
@@ -247,6 +259,40 @@ public class HttpServer extends NanoHTTPD {
 			Response.Status.NOT_FOUND,
 			MIME_PLAINTEXT,
 			"Not Found"
+		);
+	}
+
+	/** Reads an optional string field; {@code null} when absent or JSON null. */
+	private static String optString(JsonObject json, String key) {
+		return json.has(key) && !json.get(key).isJsonNull()
+			? json.get(key).getAsString()
+			: null;
+	}
+
+	/** Reads an optional numeric field; {@code null} when absent or not a number. */
+	private static Long optLong(JsonObject json, String key) {
+		if (!json.has(key) || json.get(key).isJsonNull()) return null;
+		try {
+			return json.get(key).getAsLong();
+		} catch (NumberFormatException | IllegalStateException e) {
+			return null;
+		}
+	}
+
+	/** Parses a UUID, returning {@code null} rather than throwing on bad input. */
+	private static UUID parseUUID(String uuid) {
+		try {
+			return UUID.fromString(uuid);
+		} catch (IllegalArgumentException e) {
+			return null;
+		}
+	}
+
+	private Response badRequest(String message) {
+		return newFixedLengthResponse(
+			Response.Status.BAD_REQUEST,
+			MIME_PLAINTEXT,
+			message
 		);
 	}
 

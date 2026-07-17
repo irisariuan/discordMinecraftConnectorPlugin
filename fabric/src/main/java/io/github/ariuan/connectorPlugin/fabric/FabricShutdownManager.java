@@ -26,6 +26,7 @@ public class FabricShutdownManager {
     private final Logger logger;
     private final ScheduledExecutorService scheduler;
     private final List<ScheduledFuture<?>> shutdownFutures = new ArrayList<>();
+    private volatile FabricCountdown activeCountdown;
     private boolean isGracePeriodShutdown = false;
     public static final long GRACE_PERIOD_TICKS = 20 * 60;
 
@@ -47,8 +48,21 @@ public class FabricShutdownManager {
             if (f != null && !f.isCancelled()) f.cancel(false);
         }
         shutdownFutures.clear();
+        stopCountdown();
         isGracePeriodShutdown = false;
         return true;
+    }
+
+    /**
+     * Stops the countdown broadcast. Cancelling the futures above is not enough
+     * once the countdown has started: it drives its own repeating future.
+     */
+    private void stopCountdown() {
+        FabricCountdown countdown = activeCountdown;
+        if (countdown != null) {
+            countdown.cancel();
+            activeCountdown = null;
+        }
     }
 
     public boolean shutdown(long tickDelay, boolean allowGracePeriod) {
@@ -83,7 +97,11 @@ public class FabricShutdownManager {
 
         if (tickDelay > 20 * 10) {
             ScheduledFuture<?> countdownFuture = scheduler.schedule(() ->
-                server.submit(() -> new FabricCountdown(server, scheduler).start(10)),
+                server.submit(() -> {
+                    FabricCountdown countdown = new FabricCountdown(server, scheduler);
+                    activeCountdown = countdown;
+                    countdown.start(10);
+                }),
                 msDelay - (20 * 10 * 50L), TimeUnit.MILLISECONDS);
             shutdownFutures.add(countdownFuture);
         }
@@ -95,6 +113,7 @@ public class FabricShutdownManager {
                 logger.info("Scheduled shutting down server");
                 server.halt(false);
                 shutdownFutures.clear();
+                stopCountdown();
                 isGracePeriodShutdown = false;
             }),
             msDelay, TimeUnit.MILLISECONDS);

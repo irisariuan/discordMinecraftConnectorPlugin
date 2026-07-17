@@ -5,7 +5,9 @@ import java.util.logging.LogRecord;
 
 /** Temporary per-command log handler that accumulates log output. */
 public class LogCapture extends Handler {
-    private final StringBuilder captured = new StringBuilder();
+    // Records arrive on whichever thread emitted them, while the captured text is
+    // read from the thread that dispatched the command.
+    private final StringBuffer captured = new StringBuffer();
 
     public String getCapturedOutput() {
         return captured.toString();
@@ -13,7 +15,7 @@ public class LogCapture extends Handler {
 
     @Override
     public void publish(LogRecord record) {
-        if (record.getMessage() != null) {
+        if (record != null && record.getMessage() != null) {
             captured.append(record.getMessage()).append("\n");
         }
     }

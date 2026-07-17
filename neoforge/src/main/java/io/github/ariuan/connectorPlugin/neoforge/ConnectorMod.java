@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import net.minecraft.commands.CommandSourceStack;
@@ -34,6 +35,14 @@ import net.neoforged.neoforge.server.permission.nodes.PermissionTypes;
 public class ConnectorMod implements IPlatformAdapter {
 
 	public static final String MOD_ID = "discordconnector";
+
+	/**
+	 * Cap on how long an HTTP worker waits for a command's captured output.
+	 * A command such as {@code stop} halts the server before the collection task
+	 * runs, so without a bound the waiting thread would never be released.
+	 */
+	private static final long COMMAND_TIMEOUT_SECONDS = 10;
+
 	private static ConnectorMod INSTANCE;
 
 	/** Permission node for the /cancelstop command (default: operators only). */
@@ -134,7 +143,10 @@ public class ConnectorMod implements IPlatformAdapter {
 	public void onServerStopping(ServerStoppingEvent event) {
 		if (verificationManager != null) verificationManager.cleanup();
 		if (httpServer != null) httpServer.stop();
-		if (logCaptureHandler != null) logger.removeHandler(logCaptureHandler);
+		if (logCaptureHandler != null) {
+			logger.removeHandler(logCaptureHandler);
+			logCaptureHandler.close();
+		}
 		scheduler.shutdownNow();
 	}
 
@@ -273,26 +285,27 @@ public class ConnectorMod implements IPlatformAdapter {
 				result = 0;
 			}
 
-			// Brief pause to allow any async log output to flush
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException ignored) {
-				Thread.currentThread().interrupt();
-			}
-
-			String output = capturing.getOutput();
-			String loggerOutput = logCapture.getCapturedOutput();
-			logger.removeHandler(logCapture);
-			future.complete(
-				new CommandResult(
-					result > 0,
-					output.trim(),
-					loggerOutput.trim()
-				)
+			// Collect after a brief pause so any async log output can flush. This
+			// waits on the scheduler rather than here, because this runnable is on
+			// the main server thread and sleeping would stall the tick loop.
+			boolean success = result > 0;
+			scheduler.schedule(
+				() -> {
+					logger.removeHandler(logCapture);
+					future.complete(
+						new CommandResult(
+							success,
+							capturing.getOutput().trim(),
+							logCapture.getCapturedOutput().trim()
+						)
+					);
+				},
+				100,
+				TimeUnit.MILLISECONDS
 			);
 		});
 		try {
-			return future.get();
+			return future.get(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 		} catch (Exception e) {
 			logger.warning("Error capturing command output: " + e.getMessage());
 			return new CommandResult(false, "", "");

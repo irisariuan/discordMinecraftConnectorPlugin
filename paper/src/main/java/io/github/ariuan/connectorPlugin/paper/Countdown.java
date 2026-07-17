@@ -5,7 +5,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 
 public class Countdown {
-    private int countdownTimer;
+    private int countdownTimer = -1;
 
     public void start(final int time) {
         this.countdownTimer = Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(
@@ -25,6 +25,8 @@ public class Countdown {
     }
 
     public void cancel() {
+        if (this.countdownTimer == -1) return;
         Bukkit.getScheduler().cancelTask(this.countdownTimer);
+        this.countdownTimer = -1;
     }
 }
