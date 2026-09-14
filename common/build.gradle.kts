@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.github.ariuan"
-version = "1.0.0"
+version = property("modVersion") as String
 
 repositories {
     mavenCentral()

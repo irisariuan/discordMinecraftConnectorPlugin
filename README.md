@@ -120,14 +120,40 @@ This plugin is available for three Minecraft server platforms:
 ## Building
 
 ```bash
-./gradlew clean build
+./gradlew build
 ```
 
+If you need a clean build, run `clean` as a **separate** invocation:
+
+```bash
+./gradlew clean
+./gradlew build
+```
+
+Do not run `./gradlew clean build` in one command. NeoGradle expands its NeoForm patch bundle into `neoforge/build/tmp` while configuring the project, and a same-invocation `clean` deletes it, so `:neoforge:neoFormSetup` fails with `patches.lzma (No such file or directory)`.
+
+A Java 21 toolchain is required. If it is not installed, Gradle downloads one automatically via the foojay toolchain resolver.
+
 The compiled JARs will be in:
-- Paper: `paper/build/libs/`
-- NeoForge: `neoforge/build/libs/`
-- Fabric: `fabric/build/libs/`
+- Paper: `paper/build/libs/minecraftDiscordConnector-paper-<version>.jar`
+- NeoForge: `neoforge/build/libs/minecraftDiscordConnector-neoforge-<version>.jar`
+- Fabric: `fabric/build/libs/minecraftDiscordConnector-fabric-<version>.jar`
+
+Jars with a `-thin` classifier do not bundle the `common` module and are not meant to be installed.
+
+The version of all three jars comes from `modVersion` in the root `gradle.properties`.
 
 ## CI/CD
 
-This project uses GitHub Actions to automatically build all three platform versions on every commit. Artifacts are available in the Actions tab.
+GitHub Actions builds all three platform versions on every push and pull request. Artifacts are available in the Actions tab.
+
+### Publishing a release
+
+Push a tag starting with `v` to publish a GitHub Release with all three jars attached:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow builds with `-PmodVersion=1.0.0` (the tag without the leading `v`), so the jar file names and the mod metadata carry the tag version.

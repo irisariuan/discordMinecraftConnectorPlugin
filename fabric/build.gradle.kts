@@ -2,8 +2,9 @@ plugins {
     id("fabric-loom") version "1.16.1"
 }
 
-version = "1.0.0"
+version = property("modVersion") as String
 group = "io.github.ariuan"
+base.archivesName.set("minecraftDiscordConnector-fabric")
 
 java {
     // Must match the other modules: Minecraft 1.21.11 runs on Java 21, so newer

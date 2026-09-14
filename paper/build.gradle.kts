@@ -3,6 +3,10 @@ plugins {
     id("com.gradleup.shadow") version "9.4.1"
 }
 
+version = property("modVersion") as String
+group = "io.github.ariuan"
+base.archivesName.set("minecraftDiscordConnector-paper")
+
 repositories {
     mavenCentral()
     maven {
@@ -20,6 +24,12 @@ dependencies {
     implementation(project(":common"))
 }
 
+// The plain jar (without :common) is kept out of the way so it cannot overwrite
+// the shadow jar, which uses the empty classifier and is the one to ship.
+tasks.jar {
+    archiveClassifier.set("thin")
+}
+
 tasks.shadowJar {
     archiveClassifier.set("")
     // exclude platform-provided classes
@@ -32,4 +42,11 @@ tasks.shadowJar {
 
 tasks.build {
     dependsOn(tasks.shadowJar)
+}
+
+tasks.processResources {
+    inputs.property("version", version)
+    filesMatching("plugin.yml") {
+        expand("version" to version)
+    }
 }

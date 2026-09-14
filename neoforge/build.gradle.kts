@@ -3,8 +3,9 @@ plugins {
     id("com.gradleup.shadow") version "9.4.1"
 }
 
-version = "1.0.0"
+version = property("modVersion") as String
 group = "io.github.ariuan"
+base.archivesName.set("minecraftDiscordConnector-neoforge")
 
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
@@ -28,6 +29,12 @@ dependencies {
 
 configurations["shadow"].apply {
     isTransitive = true
+}
+
+// The plain jar (without :common) is kept out of the way so it cannot overwrite
+// the shadow jar, which uses the empty classifier and is the one to ship.
+tasks.jar {
+    archiveClassifier.set("thin")
 }
 
 tasks.shadowJar {
