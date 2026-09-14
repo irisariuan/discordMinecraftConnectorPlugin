@@ -2,7 +2,7 @@
 
 ## Overview
 
-This plugin implements a player verification and monitoring system that restricts player actions until they are verified via an external API. The system integrates with an external service to control player access and monitor their session time.
+This plugin implements a player verification and monitoring system that restricts player actions until they are verified by the Discord bot. The bot controls player access and monitors session time over a local IPC channel.
 
 ## Features
 
@@ -19,64 +19,50 @@ When a player joins the server, they are immediately restricted from performing 
 ### Verification System
 
 When a player joins:
-1. The plugin calls the `/verify` endpoint (POST) with the player's UUID
-2. The API responds with a verification status
+1. The plugin calls `player.verify` over the IPC channel with the player's UUID
+   and name
+2. The bot responds with a verification status
 3. If verified, all restrictions are lifted
-4. If not verified, the player is kicked from the server
+4. If not verified, the player is told to link their account in Discord
 
 ### Session Monitoring
 
 Once verified, the plugin monitors each player:
-1. Every 30 seconds, calls the `/play` endpoint (POST) with:
-   - Player UUID
-   - Current session online time (in seconds)
-2. The API can respond with a kick instruction
+1. Every `period-per-request` ticks, calls `player.play` with:
+   - Player UUID and name
+   - Current session online time (in milliseconds)
+2. The bot can respond with a kick instruction
 3. If instructed, the player is kicked with an appropriate message
+
+## Transport
+
+The plugin and the bot talk over a **Unix domain socket** — no HTTP, and no
+listening port on either side. The bot creates the socket when it launches the
+server and passes the path in the `CONNECTOR_IPC_SOCKET` environment variable;
+the plugin dials it and reconnects with backoff, so a bot restart only detaches
+the server until the next attempt succeeds. Frames are newline-delimited JSON
+and both sides may issue requests over the same connection.
+
+The full wire format and method list live in `docs/IPC.md` in the
+[bot repository](https://github.com/irisariuan/minecraftDiscordConnector).
+
+Transport code is platform-agnostic and lives in the `common` module:
+
+- **IpcClient**: socket session, framing, request/response correlation, reconnect
+- **ConnectorApi**: the methods the bot may call (delegated to the platform
+  adapter) plus the typed calls the plugin makes back into the bot
 
 ## Configuration
 
-Edit `config.yml` in the plugin data folder:
+Edit the config file in the plugin/mod data folder (`config.yml` for Paper,
+`config/discordconnector/config.json` for Fabric and NeoForge):
 
 ```yaml
-# API URL for player verification and monitoring
-api-url: "http://localhost:8080"
-```
-
-## API Endpoints
-
-### POST /verify
-
-**Request:**
-```json
-{
-  "uuid": "player-uuid-here",
-  "serverPort": 25565
-}
-```
-
-**Response:**
-```json
-{
-  "verified": true
-}
-```
-
-### POST /play
-
-**Request:**
-```json
-{
-  "uuid": "player-uuid-here",
-  "onlineTime": 1234,
-  "serverPort": 25565
-}
-```
-
-**Response:**
-```json
-{
-  "kick": false
-}
+# Leave empty to use CONNECTOR_IPC_SOCKET, falling back to connector.sock in
+# the server directory. Set it only if the socket lives somewhere else.
+socket-path: ""
+# How often to re-check player credits, in ticks (default 30 minutes)
+period-per-request: 36000
 ```
 
 ## Installation
@@ -84,14 +70,16 @@ api-url: "http://localhost:8080"
 1. Download the plugin JAR file
 2. Place it in your server's `plugins` folder
 3. Start/restart your server
-4. Edit `plugins/DiscordConnectorPlugin/config.yml` with your API URL
+4. Only if the socket lives outside the server directory and the bot does not
+   launch the server: set `socket-path` in
+   `plugins/DiscordConnectorPlugin/config.yml`
 5. Reload/restart the server
 
 ## Technical Details
 
 ### Classes
 
-- **PlayerVerificationManager**: Handles API communication and player session tracking
+- **PlayerVerificationManager**: Handles bot communication and player session tracking
 - **PlayerRestrictionListener**: Listens to player events and enforces restrictions
 - **ConnectorPlugin**: Main plugin class that coordinates everything
 
@@ -101,14 +89,14 @@ The plugin uses Bukkit's event system with HIGHEST priority to ensure restrictio
 
 ### Threading
 
-- Verification and monitoring API calls are made asynchronously to avoid blocking the main server thread
+- Verification and monitoring calls are made asynchronously to avoid blocking the main server thread
 - Player kicks and state changes are executed on the main thread for thread safety
 
 ## Dependencies
 
 - PaperMC API 1.21.11
-- NanoHTTPD 2.2.0
 - GSON 2.12.1
+- Java 21 (Unix domain sockets need Java 16+)
 
 ## Multi-Platform Support
 

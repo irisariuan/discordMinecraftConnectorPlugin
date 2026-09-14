@@ -1,18 +1,12 @@
 package io.github.ariuan.connectorPlugin.neoforge;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import io.github.ariuan.connectorPlugin.common.ConnectorApi;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,17 +17,17 @@ import java.util.logging.Logger;
 
 public class NeoForgePlayerVerificationManager {
     private final MinecraftServer server;
-    private final String apiUrl;
+    private final ConnectorApi api;
     private final long periodMs;
     private final Logger logger;
     private final ScheduledExecutorService scheduler;
     private final Map<UUID, PlayerSession> playerSessions = new ConcurrentHashMap<>();
     private final Map<UUID, ScheduledFuture<?>> monitoringTasks = new ConcurrentHashMap<>();
 
-    public NeoForgePlayerVerificationManager(MinecraftServer server, String apiUrl, long periodTick,
+    public NeoForgePlayerVerificationManager(MinecraftServer server, ConnectorApi api, long periodTick,
                                              Logger logger, ScheduledExecutorService scheduler) {
         this.server = server;
-        this.apiUrl = apiUrl;
+        this.api = api;
         this.periodMs = periodTick * 50L;
         this.logger = logger;
         this.scheduler = scheduler;
@@ -48,7 +42,7 @@ public class NeoForgePlayerVerificationManager {
 
         scheduler.submit(() -> {
             try {
-                boolean verified = callVerifyEndpoint(player);
+                boolean verified = api.verify(player.getUUID(), player.getName().getString());
                 server.submit(() -> {
                     if (verified) {
                         session.setVerified(true);
@@ -70,36 +64,6 @@ public class NeoForgePlayerVerificationManager {
         });
     }
 
-    private boolean callVerifyEndpoint(ServerPlayer player) throws IOException {
-        URL url = URI.create(apiUrl + "/verify").toURL();
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        try {
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-
-            JsonObject json = new JsonObject();
-            json.addProperty("uuid", player.getUUID().toString());
-            json.addProperty("playerName", player.getName().getString());
-            json.addProperty("serverPort", server.getPort());
-
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(json.toString().getBytes(StandardCharsets.UTF_8));
-            }
-
-            if (conn.getResponseCode() == 200) {
-                String response = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                JsonObject responseJson = JsonParser.parseString(response).getAsJsonObject();
-                return responseJson.has("verified") && responseJson.get("verified").getAsBoolean();
-            }
-            return false;
-        } finally {
-            conn.disconnect();
-        }
-    }
-
     private void startMonitoring(ServerPlayer player) {
         UUID uuid = player.getUUID();
         PlayerSession session = playerSessions.get(uuid);
@@ -111,7 +75,8 @@ public class NeoForgePlayerVerificationManager {
                 return;
             }
             try {
-                boolean shouldKick = callPlayEndpoint(player, session.getOnlineTime(), false);
+                boolean shouldKick = api.play(
+                        player.getUUID(), player.getName().getString(), session.getOnlineTime(), false);
                 if (shouldKick) {
                     server.submit(() -> {
                         if (server.getPlayerList().getPlayers().contains(player)) {
@@ -136,46 +101,12 @@ public class NeoForgePlayerVerificationManager {
         long onlineTime = session.getOnlineTime();
         scheduler.submit(() -> {
             try {
-                callPlayEndpoint(player, onlineTime, true);
+                api.play(uuid, player.getName().getString(), onlineTime, true);
             } catch (IOException e) {
-                logger.warning("Error calling play endpoint (disconnecting) for "
+                logger.warning("Error reporting the final online time for "
                         + player.getName().getString() + ": " + e.getMessage());
             }
         });
-    }
-
-    private boolean callPlayEndpoint(ServerPlayer player, long onlineTime, boolean disconnect) throws IOException {
-        URL url = URI.create(apiUrl + "/play").toURL();
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        try {
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-
-            JsonObject json = new JsonObject();
-            json.addProperty("uuid", player.getUUID().toString());
-            json.addProperty("playerName", player.getName().getString());
-            json.addProperty("serverPort", server.getPort());
-            json.addProperty("onlineTime", onlineTime);
-            json.addProperty("disconnect", disconnect);
-
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(json.toString().getBytes(StandardCharsets.UTF_8));
-            }
-
-            int code = conn.getResponseCode();
-            if (code == 200) {
-                if (disconnect) return true;
-                String response = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                JsonObject responseJson = JsonParser.parseString(response).getAsJsonObject();
-                return responseJson.has("kick") && responseJson.get("kick").getAsBoolean();
-            }
-            return false;
-        } finally {
-            conn.disconnect();
-        }
     }
 
     public void stopMonitoring(ServerPlayer player) {

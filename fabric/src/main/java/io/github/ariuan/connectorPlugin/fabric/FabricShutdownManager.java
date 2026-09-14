@@ -1,18 +1,12 @@
 package io.github.ariuan.connectorPlugin.fabric;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import io.github.ariuan.connectorPlugin.common.ConnectorApi;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
@@ -22,7 +16,7 @@ import java.util.logging.Logger;
 
 public class FabricShutdownManager {
     private final MinecraftServer server;
-    private final String apiUrl;
+    private final ConnectorApi api;
     private final Logger logger;
     private final ScheduledExecutorService scheduler;
     private final List<ScheduledFuture<?>> shutdownFutures = new ArrayList<>();
@@ -30,10 +24,10 @@ public class FabricShutdownManager {
     private boolean isGracePeriodShutdown = false;
     public static final long GRACE_PERIOD_TICKS = 20 * 60;
 
-    public FabricShutdownManager(MinecraftServer server, String apiUrl, Logger logger,
+    public FabricShutdownManager(MinecraftServer server, ConnectorApi api, Logger logger,
                                   ScheduledExecutorService scheduler) {
         this.server = server;
-        this.apiUrl = apiUrl;
+        this.api = api;
         this.logger = logger;
         this.scheduler = scheduler;
     }
@@ -139,52 +133,25 @@ public class FabricShutdownManager {
             return false;
         }
         try {
-            boolean allowed = callCancelStopEndpoint(player);
-            if (allowed) {
+            ConnectorApi.CancelDecision decision =
+                    api.requestCancelShutdown(player.getUUID(), player.getName().getString());
+            if (decision.allowed()) {
                 return cancelShutdown();
-            } else {
-                logger.info("API denied shutdown cancellation");
-                server.submit(() ->
-                    server.getPlayerList().broadcastSystemMessage(
-                        Component.literal("Shutdown cancellation denied by API").withStyle(ChatFormatting.RED), false));
-                return false;
             }
-        } catch (IOException e) {
-            logger.warning("Error calling cancel-stop endpoint: " + e.getMessage());
+            String reason = decision.reason() == null ? "denied by the bot" : decision.reason();
+            logger.info("Bot denied shutdown cancellation: " + reason);
             server.submit(() ->
                 server.getPlayerList().broadcastSystemMessage(
-                    Component.literal("Error contacting API for shutdown cancellation").withStyle(ChatFormatting.RED), false));
+                    Component.literal("Shutdown cancellation denied: " + reason)
+                             .withStyle(ChatFormatting.RED), false));
             return false;
-        }
-    }
-
-    private boolean callCancelStopEndpoint(ServerPlayer player) throws IOException {
-        URL url = URI.create(apiUrl + "/cancelShutdown").toURL();
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        try {
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-
-            JsonObject json = new JsonObject();
-            json.addProperty("serverPort", server.getPort());
-            json.addProperty("uuid", player.getUUID().toString());
-            json.addProperty("playerName", player.getName().getString());
-
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(json.toString().getBytes(StandardCharsets.UTF_8));
-            }
-
-            if (conn.getResponseCode() == 200) {
-                String response = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                JsonObject responseJson = JsonParser.parseString(response).getAsJsonObject();
-                return responseJson.has("allowed") && responseJson.get("allowed").getAsBoolean();
-            }
+        } catch (IOException e) {
+            logger.warning("Error requesting shutdown cancellation: " + e.getMessage());
+            server.submit(() ->
+                server.getPlayerList().broadcastSystemMessage(
+                    Component.literal("Error contacting the bot for shutdown cancellation")
+                             .withStyle(ChatFormatting.RED), false));
             return false;
-        } finally {
-            conn.disconnect();
         }
     }
 }

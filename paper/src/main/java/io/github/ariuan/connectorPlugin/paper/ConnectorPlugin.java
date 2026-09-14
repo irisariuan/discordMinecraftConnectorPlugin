@@ -30,13 +30,13 @@ public class ConnectorPlugin
 {
 
 	/**
-	 * Cap on how long an HTTP worker waits for a command's captured output.
+	 * Cap on how long an IPC worker waits for a command's captured output.
 	 * A command such as {@code stop} shuts the server down before the collection
 	 * task runs, so without a bound the waiting thread would never be released.
 	 */
 	private static final long COMMAND_TIMEOUT_SECONDS = 10;
 
-	private HttpServer httpServer;
+	private ConnectorApi connectorApi;
 	private static ConnectorPlugin instance;
 	private LogCaptureHandler logCaptureHandler;
 	private PlayerVerificationManager verificationManager;
@@ -53,24 +53,28 @@ public class ConnectorPlugin
 		FileConfiguration customConfig = YamlConfiguration.loadConfiguration(
 			customConfigFile
 		);
-		String apiUrl = customConfig.getString("api-url");
+		String socketPath = customConfig.getString("socket-path");
 		long periodPerRequest = customConfig.getLong(
 			"period-per-request",
 			36000L
 		);
-		if (apiUrl == null) {
-			throw new IllegalStateException("Please set api-url in config.yml");
-		}
+
+		connectorApi = new ConnectorApi(
+			IpcClient.resolveSocketPath(socketPath),
+			"paper",
+			getPluginMeta().getVersion(),
+			this
+		);
 
 		verificationManager = new PlayerVerificationManager(
 			this,
-			apiUrl,
+			connectorApi,
 			periodPerRequest
 		);
 		restrictionListener = new PlayerRestrictionListener(
 			verificationManager
 		);
-		shutdownManager = new ShutdownManager(this, apiUrl);
+		shutdownManager = new ShutdownManager(this, connectorApi);
 
 		File logFile = new File(getDataFolder(), "log.txt");
 		try {
@@ -90,22 +94,13 @@ public class ConnectorPlugin
 		}
 		getLogger().addHandler(logCaptureHandler);
 
-		try {
-			httpServer = new HttpServer(6001, this);
-			getLogger().info("HTTP server started on port: 6001");
-		} catch (IOException e) {
-			getLogger().warning(
-				"Error creating HTTP server: " + e.getMessage()
-			);
-		}
-
 		Bukkit.getPluginManager().registerEvents(this, this);
 		Bukkit.getPluginManager().registerEvents(restrictionListener, this);
 		this.getCommand("cancelstop").setExecutor(new CancelStopCommand(this));
 
-		getLogger().info(
-			"Player verification system enabled with API URL: " + apiUrl
-		);
+		// Started last: incoming calls are answered from the managers above.
+		connectorApi.start();
+		getLogger().info("Player verification system enabled");
 	}
 
 	public static ConnectorPlugin getInstance() {
@@ -313,8 +308,8 @@ public class ConnectorPlugin
 		if (verificationManager != null) {
 			verificationManager.cleanup();
 		}
-		if (httpServer != null) {
-			httpServer.stop();
+		if (connectorApi != null) {
+			connectorApi.close();
 		}
 		if (logCaptureHandler != null) {
 			getLogger().removeHandler(logCaptureHandler);

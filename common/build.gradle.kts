@@ -24,6 +24,5 @@ publishing {
 
 dependencies {
     compileOnly("org.jetbrains:annotations:26.0.1")
-    api("org.nanohttpd:nanohttpd:2.2.0")
     implementation("com.google.code.gson:gson:2.12.1")
 }

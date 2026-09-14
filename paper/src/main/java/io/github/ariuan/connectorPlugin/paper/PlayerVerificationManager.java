@@ -1,7 +1,6 @@
 package io.github.ariuan.connectorPlugin.paper;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import io.github.ariuan.connectorPlugin.common.ConnectorApi;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -9,27 +8,20 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class PlayerVerificationManager {
     private final ConnectorPlugin plugin;
-    private final String apiUrl;
-    private final int serverPort;
+    private final ConnectorApi api;
     private final long periodTick;
     private final Map<UUID, PlayerSession> playerSessions = new ConcurrentHashMap<>();
     private final Map<UUID, BukkitTask> monitoringTasks = new ConcurrentHashMap<>();
 
-    public PlayerVerificationManager(ConnectorPlugin plugin, String apiUrl, long periodTick) {
+    public PlayerVerificationManager(ConnectorPlugin plugin, ConnectorApi api, long periodTick) {
         this.plugin = plugin;
-        this.apiUrl = apiUrl;
-        this.serverPort = Bukkit.getServer().getPort();
+        this.api = api;
         this.periodTick = periodTick;
     }
 
@@ -61,7 +53,7 @@ public class PlayerVerificationManager {
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                boolean verified = callVerifyEndpoint(player);
+                boolean verified = api.verify(player.getUniqueId(), player.getName());
 
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     if (verified) {
@@ -84,36 +76,6 @@ public class PlayerVerificationManager {
         });
     }
 
-    private boolean callVerifyEndpoint(Player player) throws IOException {
-        URL url = URI.create(apiUrl + "/verify").toURL();
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        try {
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-
-            JsonObject json = new JsonObject();
-            json.addProperty("uuid", player.getUniqueId().toString());
-            json.addProperty("playerName", player.getName());
-            json.addProperty("serverPort", serverPort);
-
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(json.toString().getBytes(StandardCharsets.UTF_8));
-            }
-
-            if (conn.getResponseCode() == 200) {
-                String response = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                JsonObject responseJson = JsonParser.parseString(response).getAsJsonObject();
-                return responseJson.has("verified") && responseJson.get("verified").getAsBoolean();
-            }
-            return false;
-        } finally {
-            conn.disconnect();
-        }
-    }
-
     private void startMonitoring(Player player) {
         UUID uuid = player.getUniqueId();
         PlayerSession session = playerSessions.get(uuid);
@@ -125,7 +87,8 @@ public class PlayerVerificationManager {
                 return;
             }
             try {
-                boolean shouldKick = callPlayEndpoint(player, session.getOnlineTime(), false);
+                boolean shouldKick = api.play(
+                        player.getUniqueId(), player.getName(), session.getOnlineTime(), false);
                 if (shouldKick) {
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         if (player.isOnline()) {
@@ -149,45 +112,11 @@ public class PlayerVerificationManager {
         long onlineTime = session.getOnlineTime();
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                callPlayEndpoint(player, onlineTime, true);
+                api.play(uuid, player.getName(), onlineTime, true);
             } catch (IOException e) {
-                plugin.getLogger().warning("Error calling play endpoint (disconnecting) for " + player.getName() + ": " + e.getMessage());
+                plugin.getLogger().warning("Error reporting the final online time for " + player.getName() + ": " + e.getMessage());
             }
         });
-    }
-
-    private boolean callPlayEndpoint(Player player, long onlineTime, boolean disconnect) throws IOException {
-        URL url = URI.create(apiUrl + "/play").toURL();
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        try {
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-
-            JsonObject json = new JsonObject();
-            json.addProperty("uuid", player.getUniqueId().toString());
-            json.addProperty("playerName", player.getName());
-            json.addProperty("serverPort", serverPort);
-            json.addProperty("onlineTime", onlineTime);
-            json.addProperty("disconnect", disconnect);
-
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(json.toString().getBytes(StandardCharsets.UTF_8));
-            }
-
-            int code = conn.getResponseCode();
-            if (code == 200) {
-                if (disconnect) return true;
-                String response = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                JsonObject responseJson = JsonParser.parseString(response).getAsJsonObject();
-                return responseJson.has("kick") && responseJson.get("kick").getAsBoolean();
-            }
-            return false;
-        } finally {
-            conn.disconnect();
-        }
     }
 
     public void stopMonitoring(Player player) {

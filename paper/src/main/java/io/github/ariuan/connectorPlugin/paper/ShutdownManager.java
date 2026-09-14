@@ -1,7 +1,6 @@
 package io.github.ariuan.connectorPlugin.paper;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import io.github.ariuan.connectorPlugin.common.ConnectorApi;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -9,25 +8,20 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ShutdownManager {
     private final ConnectorPlugin plugin;
-    private final String apiUrl;
+    private final ConnectorApi api;
     private final List<BukkitTask> shutdownTasks = new ArrayList<>();
     private volatile Countdown activeCountdown;
     private boolean isGracePeriodShutdown = false;
     public static final long GRACE_PERIOD_TICKS = 20 * 60;
 
-    public ShutdownManager(ConnectorPlugin plugin, String apiUrl) {
+    public ShutdownManager(ConnectorPlugin plugin, ConnectorApi api) {
         this.plugin = plugin;
-        this.apiUrl = apiUrl;
+        this.api = api;
     }
 
     public boolean cancelShutdown() {
@@ -115,48 +109,19 @@ public class ShutdownManager {
             return false;
         }
         try {
-            boolean allowed = callCancelStopEndpoint(player);
-            if (allowed) {
+            ConnectorApi.CancelDecision decision =
+                    api.requestCancelShutdown(player.getUniqueId(), player.getName());
+            if (decision.allowed()) {
                 return cancelShutdown();
-            } else {
-                plugin.getLogger().info("API denied shutdown cancellation");
-                Bukkit.broadcast(Component.text("Shutdown cancellation denied by API", NamedTextColor.RED));
-                return false;
             }
+            String reason = decision.reason() == null ? "denied by the bot" : decision.reason();
+            plugin.getLogger().info("Bot denied shutdown cancellation: " + reason);
+            Bukkit.broadcast(Component.text("Shutdown cancellation denied: " + reason, NamedTextColor.RED));
+            return false;
         } catch (IOException e) {
-            plugin.getLogger().warning("Error calling cancel-stop endpoint: " + e.getMessage());
-            Bukkit.broadcast(Component.text("Error contacting API for shutdown cancellation", NamedTextColor.RED));
+            plugin.getLogger().warning("Error requesting shutdown cancellation: " + e.getMessage());
+            Bukkit.broadcast(Component.text("Error contacting the bot for shutdown cancellation", NamedTextColor.RED));
             return false;
-        }
-    }
-
-    private boolean callCancelStopEndpoint(Player player) throws IOException {
-        URL url = URI.create(apiUrl + "/cancelShutdown").toURL();
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        try {
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-
-            JsonObject json = new JsonObject();
-            json.addProperty("serverPort", Bukkit.getServer().getPort());
-            json.addProperty("uuid", player.getUniqueId().toString());
-            json.addProperty("playerName", player.getName());
-
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(json.toString().getBytes(StandardCharsets.UTF_8));
-            }
-
-            if (conn.getResponseCode() == 200) {
-                String response = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                JsonObject responseJson = JsonParser.parseString(response).getAsJsonObject();
-                return responseJson.has("allowed") && responseJson.get("allowed").getAsBoolean();
-            }
-            return false;
-        } finally {
-            conn.disconnect();
         }
     }
 }

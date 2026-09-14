@@ -37,7 +37,7 @@ public class ConnectorMod implements IPlatformAdapter {
 	public static final String MOD_ID = "discordconnector";
 
 	/**
-	 * Cap on how long an HTTP worker waits for a command's captured output.
+	 * Cap on how long an IPC worker waits for a command's captured output.
 	 * A command such as {@code stop} halts the server before the collection task
 	 * runs, so without a bound the waiting thread would never be released.
 	 */
@@ -60,7 +60,7 @@ public class ConnectorMod implements IPlatformAdapter {
 		Executors.newScheduledThreadPool(4);
 
 	private MinecraftServer server;
-	private HttpServer httpServer;
+	private ConnectorApi connectorApi;
 	private LogCaptureHandler logCaptureHandler;
 	private NeoForgePlayerVerificationManager verificationManager;
 	private NeoForgeShutdownManager shutdownManager;
@@ -79,13 +79,9 @@ public class ConnectorMod implements IPlatformAdapter {
 	public void onServerStarted(ServerStartedEvent event) {
 		this.server = event.getServer();
 
-		String apiUrl = readConfig("api-url");
-		if (apiUrl == null || apiUrl.isEmpty()) {
-			logger.severe(
-				"Please set api-url in config/discordconnector/config.json"
-			);
-			return;
-		}
+		// An absent socket path is fine: the environment variable the bot sets,
+		// or the default socket in the server directory, takes over.
+		String socketPath = readConfig("socket-path");
 		long periodPerRequest = 36000L;
 		String periodStr = readConfig("period-per-request");
 		if (periodStr != null && !periodStr.isEmpty()) {
@@ -94,9 +90,16 @@ public class ConnectorMod implements IPlatformAdapter {
 			} catch (NumberFormatException ignored) {}
 		}
 
+		connectorApi = new ConnectorApi(
+			IpcClient.resolveSocketPath(socketPath),
+			"neoforge",
+			modVersion(),
+			this
+		);
+
 		verificationManager = new NeoForgePlayerVerificationManager(
 			server,
-			apiUrl,
+			connectorApi,
 			periodPerRequest,
 			logger,
 			scheduler
@@ -106,7 +109,7 @@ public class ConnectorMod implements IPlatformAdapter {
 		);
 		shutdownManager = new NeoForgeShutdownManager(
 			server,
-			apiUrl,
+			connectorApi,
 			logger,
 			scheduler
 		);
@@ -128,21 +131,23 @@ public class ConnectorMod implements IPlatformAdapter {
 		logCaptureHandler.setFormatter(new SimpleFormatter());
 		logger.addHandler(logCaptureHandler);
 
-		try {
-			httpServer = new HttpServer(6001, this);
-		} catch (IOException e) {
-			logger.warning("Error creating HTTP server: " + e.getMessage());
-		}
+		// Started last: incoming calls are answered from the managers above.
+		connectorApi.start();
+		logger.info("Player verification system enabled");
+	}
 
-		logger.info(
-			"Player verification system enabled with API URL: " + apiUrl
-		);
+	/** The version NeoForge loaded this mod under, for the IPC handshake. */
+	private String modVersion() {
+		return net.neoforged.fml.ModList.get()
+			.getModContainerById(MOD_ID)
+			.map(container -> container.getModInfo().getVersion().toString())
+			.orElse("unknown");
 	}
 
 	@SubscribeEvent
 	public void onServerStopping(ServerStoppingEvent event) {
 		if (verificationManager != null) verificationManager.cleanup();
-		if (httpServer != null) httpServer.stop();
+		if (connectorApi != null) connectorApi.close();
 		if (logCaptureHandler != null) {
 			logger.removeHandler(logCaptureHandler);
 			logCaptureHandler.close();
@@ -381,7 +386,7 @@ public class ConnectorMod implements IPlatformAdapter {
 				configFile.getParentFile().mkdirs();
 				try (OutputStream os = new FileOutputStream(configFile)) {
 					String defaults =
-						"{\n  \"api-url\": \"\",\n  \"period-per-request\": 36000\n}\n";
+						"{\n  \"socket-path\": \"\",\n  \"period-per-request\": 36000\n}\n";
 					os.write(defaults.getBytes(StandardCharsets.UTF_8));
 				} catch (IOException e) {
 					logger.warning(

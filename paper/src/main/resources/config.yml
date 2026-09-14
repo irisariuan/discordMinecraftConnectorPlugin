@@ -1,5 +1,7 @@
 # Default configuration for DiscordConnectorPlugin
-# api-url: The base URL of the Discord connector API (required)
-api-url: ""
+# socket-path: Path of the connector IPC socket. Leave empty to use the
+# CONNECTOR_IPC_SOCKET environment variable the bot sets when it launches the
+# server, falling back to connector.sock in the server directory.
+socket-path: ""
 # period-per-request: How often to check player credits, in ticks (default 30 minutes)
 period-per-request: 36000
